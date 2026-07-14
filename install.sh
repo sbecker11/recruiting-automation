@@ -1,11 +1,14 @@
 #!/bin/zsh
 # Install and start the 36-hour recruiting automation window.
 # Safe to re-run: clears any prior HALT sentinel and resets the 36h clock from "now".
+#
+# RECRUITING_AUTOMATION_* env vars are test-only overrides (see tests/) —
+# every one defaults to the real production path/label when unset.
 set -uo pipefail
 
-BASE="$HOME/workspace-recruiting-automation/recruiting-automation"
-PLIST_LABEL="com.sbecker11.recruiting-automation"
-PLIST_PATH="$HOME/Library/LaunchAgents/$PLIST_LABEL.plist"
+BASE="${RECRUITING_AUTOMATION_BASE:-$HOME/workspace-recruiting-automation/recruiting-automation}"
+PLIST_LABEL="${RECRUITING_AUTOMATION_PLIST_LABEL:-com.sbecker11.recruiting-automation}"
+PLIST_PATH="${RECRUITING_AUTOMATION_PLIST_PATH:-$HOME/Library/LaunchAgents/$PLIST_LABEL.plist}"
 WINDOW_HOURS=${1:-36}
 
 mkdir -p "$BASE/state" "$BASE/logs"

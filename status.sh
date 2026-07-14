@@ -1,9 +1,11 @@
 #!/bin/zsh
 # Quick status check: is the schedule loaded, is it halted, how much time is left, latest log tail.
+#
+# RECRUITING_AUTOMATION_* env vars are test-only overrides (see tests/).
 set -uo pipefail
 
-BASE="$HOME/workspace-recruiting-automation/recruiting-automation"
-PLIST_LABEL="com.sbecker11.recruiting-automation"
+BASE="${RECRUITING_AUTOMATION_BASE:-$HOME/workspace-recruiting-automation/recruiting-automation}"
+PLIST_LABEL="${RECRUITING_AUTOMATION_PLIST_LABEL:-com.sbecker11.recruiting-automation}"
 
 echo "--- launchd status ---"
 launchctl print "gui/$(id -u)/$PLIST_LABEL" 2>&1 | head -20 || echo "(not loaded)"

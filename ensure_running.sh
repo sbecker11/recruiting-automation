@@ -12,13 +12,17 @@
 # and healthy — this runs on every login (including ones where nothing is
 # wrong), so it must be a safe no-op in the common case rather than always
 # resetting the 36-hour window just because a login happened.
+#
+# RECRUITING_AUTOMATION_* env vars are test-only overrides (see tests/) —
+# every one defaults to the real production path/label/script when unset.
 
 set -uo pipefail
 
-BASE="$HOME/workspace-recruiting-automation/recruiting-automation"
-PLIST_LABEL="com.sbecker11.recruiting-automation"
+BASE="${RECRUITING_AUTOMATION_BASE:-$HOME/workspace-recruiting-automation/recruiting-automation}"
+PLIST_LABEL="${RECRUITING_AUTOMATION_PLIST_LABEL:-com.sbecker11.recruiting-automation}"
 HALT_FILE="$BASE/state/HALT"
 LOG="$BASE/logs/login-check.log"
+INSTALL_SCRIPT="${RECRUITING_AUTOMATION_INSTALL_SCRIPT:-$BASE/install.sh}"
 
 mkdir -p "$BASE/logs"
 
@@ -41,5 +45,5 @@ else
   log "login check: not loaded — restarting."
 fi
 
-"$BASE/install.sh" >> "$LOG" 2>&1
+"$INSTALL_SCRIPT" >> "$LOG" 2>&1
 log "login check: restart complete."

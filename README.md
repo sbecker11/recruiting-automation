@@ -62,10 +62,12 @@ whether it's actually needed.
 | File | Purpose |
 |---|---|
 | `install.sh` | Start (or restart) the automation: clears any `state/HALT`, resets the 36-hour window from "now", writes/reloads the main LaunchAgent. **Safe to re-run anytime** — this is also the fix for "the schedule stopped and I want it running again." |
-| `run_cycle.sh` | One tick of the pipeline (see diagram above). Called hourly by launchd, and once immediately on install (`RunAtLoad`). Owns all the safety behavior — see below. |
+| `run_cycle.sh` | One tick of the pipeline (see diagram above). Called hourly by launchd, and once immediately on install (`RunAtLoad`). Sources `lib/cycle_safety.sh` for all the safety behavior — see below. |
+| `lib/cycle_safety.sh` | The actual halt/timeout/shutdown-trap logic, factored out of `run_cycle.sh` (2026-07-13) specifically so `tests/` can exercise it in isolation. Not meant to be run directly. |
 | `ensure_running.sh` | Runs once per login (see the login-check LaunchAgent below). If the main automation isn't loaded, or is loaded but halted, re-runs `install.sh`. No-ops otherwise. |
 | `status.sh` | Quick health check: launchd state, halt sentinel, time remaining in the 36h window, tail of the latest log. |
 | `stop.sh` | Manually stop early (writes `HALT`, unloads the LaunchAgent). |
+| `tests/` | `bats-core` test suite for all of the above — see `tests/README.md`. |
 | `state/HALT` | Sentinel file. Presence means the schedule is stopped and `run_cycle.sh` will no-op + unload itself on its next tick if somehow still loaded. Cleared automatically by `install.sh`/`ensure_running.sh`. |
 | `state/expiry_epoch` | Unix epoch when the current 36-hour window ends. Written by `install.sh`. On expiry, `run_cycle.sh` stops itself with reason "ready for Monday triage" — this is a deliberate design (forces a periodic manual check-in), not a bug; re-run `install.sh` to start a fresh window. |
 | `logs/run-*.log` | One timestamped log per cycle tick, full output of all 4 steps. |
@@ -133,6 +135,22 @@ Three different states, three different implications for this pipeline:
 - **Login/reboot**: `com.sbecker11.recruiting-automation-login-check` fires
   `ensure_running.sh`, which restarts the main schedule if it isn't already
   loaded and healthy.
+
+## Testing
+
+```bash
+brew install bats-core
+bats tests/
+```
+
+Every script (`run_cycle.sh`, `install.sh`, `status.sh`, `stop.sh`,
+`ensure_running.sh`) reads its `BASE`/`PLIST_LABEL`/`PLIST_PATH`/repo paths
+from `RECRUITING_AUTOMATION_*` environment variables, each defaulting to the
+real production value when unset — so normal use is completely unaffected,
+but `tests/` can point every one of them at a throwaway sandbox instead and
+never touch the real `HALT` sentinel, the real 36-hour window, the real
+LaunchAgent, or make a live Gmail/Anthropic call. See `tests/README.md` for
+exactly what's covered and how the isolation works.
 
 ## OAuth token expiry (resolved 2026-07-13)
 
