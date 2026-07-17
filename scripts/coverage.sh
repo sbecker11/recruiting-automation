@@ -34,5 +34,6 @@ echo "--- recruiting-automation summary ---"
 echo "  Tests:             ${passed} passed / ${failed} failed / ${planned} planned"
 echo "  Line coverage:     N/A (shell/bats)"
 echo "  Branch coverage:   N/A"
+echo "  Colors: green ≥90% · yellow ≥70% · red <70% (N/A when unmeasured)"
 
 exit "$bats_rc"
