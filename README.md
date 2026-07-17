@@ -69,6 +69,8 @@ whether it's actually needed.
 | `status.sh` | Quick health check: launchd state, halt sentinel, configured window + time remaining, last 5 install-log entries, last 5 cycles' pass/fail outcomes, whether both sibling repos actually resolve `ANTHROPIC_API_KEY`, and a tail of the latest log. This is the one command to run for "what's the current and historic status of the process." |
 | `stop.sh` | Manually stop early (writes `HALT`, unloads the LaunchAgent). |
 | `tests/` | `bats-core` test suite for all of the above — see `tests/README.md`. |
+| `scripts/coverage.sh` | Run this repo's bats suite and print a pass/fail summary (line coverage N/A for shell). |
+| `scripts/report-coverage-all.sh` | Workspace rollup: runs each sibling's `scripts/coverage.sh` and prints a group table. |
 | `state/HALT` | Sentinel file. Presence means the schedule is stopped and `run_cycle.sh` will no-op + unload itself on its next tick if somehow still loaded. Cleared automatically by `install.sh`/`ensure_running.sh`. |
 | `state/expiry_epoch` | Unix epoch when the current window ends. Written by `install.sh`. On expiry, `run_cycle.sh` stops itself with reason "ready for Monday triage" — this is a deliberate design (forces a periodic manual check-in), not a bug; re-run `install.sh` to start a fresh window. |
 | `state/window_hours` | The `WINDOW_HOURS` value `install.sh` actually used to compute the expiry above — lets `status.sh` show the configured length, not just time remaining. |
@@ -144,7 +146,28 @@ Three different states, three different implications for this pipeline:
 ```bash
 brew install bats-core
 bats tests/
+
+# Same suite via the convenience wrapper (prints pass/fail; coverage N/A
+# for shell — bats has no line-coverage tooling assumed here):
+./scripts/coverage.sh
 ```
+
+### Workspace coverage rollup
+
+From the parent workspace directory (or via this repo's orchestrator):
+
+```bash
+# Thin wrapper at the workspace root (not versioned — this parent isn't a git repo):
+../report-coverage.sh
+
+# Versioned equivalent (safe to run from anywhere):
+./scripts/report-coverage-all.sh
+```
+
+That runs `job-tracker/scripts/coverage.sh`, `comms-migration/scripts/coverage.sh`,
+and this repo's `scripts/coverage.sh`, then prints a per-project + group table.
+Exits non-zero if any suite fails. Python projects report pytest-cov line/branch
+%; this repo reports bats pass/fail with coverage marked N/A.
 
 Every script (`run_cycle.sh`, `install.sh`, `status.sh`, `stop.sh`,
 `ensure_running.sh`) reads its `BASE`/`PLIST_LABEL`/`PLIST_PATH`/repo paths
