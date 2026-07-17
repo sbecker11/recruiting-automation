@@ -5,7 +5,7 @@
 # throwaway sandbox for every test — this never bootstraps/checks the real
 # production LaunchAgent, and INSTALL_SCRIPT is always a stub that just
 # leaves a marker rather than the real install.sh (which would reload a
-# real LaunchAgent and reset the real 36h window if invoked for real).
+# real LaunchAgent and reset the real 48h window if invoked for real).
 
 setup() {
   TEST_DIR="$(mktemp -d)"
@@ -18,6 +18,7 @@ setup() {
   cat > "$STUB_INSTALL" <<'STUB'
 #!/bin/zsh
 echo "stub install invoked" >> "$STUB_MARKER"
+echo "reason received: ${RECRUITING_AUTOMATION_INSTALL_REASON:-<unset>}" >> "$STUB_MARKER"
 STUB
   chmod +x "$STUB_INSTALL"
   STUB_MARKER="$TEST_DIR/stub_marker.log"
@@ -57,7 +58,47 @@ run_ensure_running() {
   grep -q "HALT sentinel present" "$BASE/logs/login-check.log"
 }
 
-@test "no-ops when the label IS loaded and no HALT is present" {
+@test "passes the restart reason through to install.sh via RECRUITING_AUTOMATION_INSTALL_REASON" {
+  # So logs/install.log's "reason=" field (written by install.sh) can say
+  # *why* a login triggered it, not just that it did — see install.sh.
+  mkdir -p "$BASE/state"
+  echo "some prior failure" > "$BASE/state/HALT"
+  run_ensure_running
+  [ "$status" -eq 0 ]
+  grep -q "reason received: login-check: HALT sentinel present (some prior failure)" "$STUB_MARKER"
+}
+
+@test "restarts when the label IS loaded but the 48-hour window has expired" {
+  # Reproduces the 2026-07-15 bug: a login can race the sibling main-schedule
+  # plist's own RunAtLoad reload, catching is_loaded() at "true" for a window
+  # that already expired (and is about to unload itself again a moment
+  # later). The expiry check must force a restart independent of that race.
+  mkdir -p "$BASE/state"
+  echo "$(( $(date +%s) - 3600 ))" > "$BASE/state/expiry_epoch"
+
+  local plist="$TEST_DIR/dummy.plist"
+  cat > "$plist" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>$PLIST_LABEL</string>
+  <key>ProgramArguments</key><array><string>/bin/sleep</string><string>2</string></array>
+  <key>RunAtLoad</key><true/>
+</dict>
+</plist>
+PLIST
+  launchctl bootstrap "gui/$(id -u)" "$plist"
+
+  run_ensure_running
+  [ "$status" -eq 0 ]
+  [[ -f "$STUB_MARKER" ]]
+  grep -q "48-hour window expired" "$BASE/logs/login-check.log"
+
+  launchctl bootout "gui/$(id -u)/$PLIST_LABEL" >/dev/null 2>&1 || true
+}
+
+@test "no-ops when the label IS loaded, unexpired, and no HALT is present" {
   # Bootstrap a real, trivial, harmless dummy agent under the fake test
   # label so is_loaded() genuinely returns true for it — then confirm we
   # clean it up again regardless of test outcome (see teardown too).

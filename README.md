@@ -61,17 +61,20 @@ whether it's actually needed.
 
 | File | Purpose |
 |---|---|
-| `install.sh` | Start (or restart) the automation: clears any `state/HALT`, resets the 36-hour window from "now", writes/reloads the main LaunchAgent. **Safe to re-run anytime** — this is also the fix for "the schedule stopped and I want it running again." |
+| `install.sh` | Start (or restart) the automation: clears any `state/HALT`, resets the window from "now" (`WINDOW_HOURS` from `.env` if present, else 48h — a CLI arg overrides both), writes/reloads the main LaunchAgent. **Safe to re-run anytime** — this is also the fix for "the schedule stopped and I want it running again." |
+| `.env` | Optional local override for `WINDOW_HOURS`. Git-ignored, no secrets — see `.env.example`. |
 | `run_cycle.sh` | One tick of the pipeline (see diagram above). Called hourly by launchd, and once immediately on install (`RunAtLoad`). Sources `lib/cycle_safety.sh` for all the safety behavior — see below. |
 | `lib/cycle_safety.sh` | The actual halt/timeout/shutdown-trap logic, factored out of `run_cycle.sh` (2026-07-13) specifically so `tests/` can exercise it in isolation. Not meant to be run directly. |
 | `ensure_running.sh` | Runs once per login (see the login-check LaunchAgent below). If the main automation isn't loaded, or is loaded but halted, re-runs `install.sh`. No-ops otherwise. |
-| `status.sh` | Quick health check: launchd state, halt sentinel, time remaining in the 36h window, tail of the latest log. |
+| `status.sh` | Quick health check: launchd state, halt sentinel, configured window + time remaining, last 5 install-log entries, last 5 cycles' pass/fail outcomes, whether both sibling repos actually resolve `ANTHROPIC_API_KEY`, and a tail of the latest log. This is the one command to run for "what's the current and historic status of the process." |
 | `stop.sh` | Manually stop early (writes `HALT`, unloads the LaunchAgent). |
 | `tests/` | `bats-core` test suite for all of the above — see `tests/README.md`. |
 | `state/HALT` | Sentinel file. Presence means the schedule is stopped and `run_cycle.sh` will no-op + unload itself on its next tick if somehow still loaded. Cleared automatically by `install.sh`/`ensure_running.sh`. |
-| `state/expiry_epoch` | Unix epoch when the current 36-hour window ends. Written by `install.sh`. On expiry, `run_cycle.sh` stops itself with reason "ready for Monday triage" — this is a deliberate design (forces a periodic manual check-in), not a bug; re-run `install.sh` to start a fresh window. |
+| `state/expiry_epoch` | Unix epoch when the current window ends. Written by `install.sh`. On expiry, `run_cycle.sh` stops itself with reason "ready for Monday triage" — this is a deliberate design (forces a periodic manual check-in), not a bug; re-run `install.sh` to start a fresh window. |
+| `state/window_hours` | The `WINDOW_HOURS` value `install.sh` actually used to compute the expiry above — lets `status.sh` show the configured length, not just time remaining. |
 | `logs/run-*.log` | One timestamped log per cycle tick, full output of all 4 steps. |
-| `logs/login-check.log` | `ensure_running.sh`'s own log (one line per login: no-op, or "restarting"). |
+| `logs/login-check.log` | `ensure_running.sh`'s own log (one line per login: no-op, or "restarting" with a reason). |
+| `logs/install.log` | Durable one-line-per-run history of every `install.sh` invocation (added 2026-07-15): timestamp, `WINDOW_HOURS` used, its source (CLI arg / `.env` / hardcoded default), resulting expiry, and *why* — `ensure_running.sh` passes its own restart reason through via `RECRUITING_AUTOMATION_INSTALL_REASON` so a login-triggered restart shows up distinctly from a manual one. Unlike `install.sh`'s own `echo` output (only captured when invoked through `ensure_running.sh`, lost otherwise), this always persists regardless of how `install.sh` was invoked. |
 | `logs/launchd.{out,err}.log` | Raw launchd stdout/stderr for the main agent (usually empty/redundant with `run-*.log`, since `run_cycle.sh` does its own logging+`tee`). |
 
 ## LaunchAgents (macOS scheduling)
@@ -81,7 +84,7 @@ Two separate agents, both under `~/Library/LaunchAgents/`:
 1. **`com.sbecker11.recruiting-automation`** — the main schedule.
    `StartInterval=3600` (hourly) + `RunAtLoad=true`. Installed/reloaded by
    `install.sh`. Unloads itself (see `run_cycle.sh`'s `unload_self`) on halt
-   or 36h expiry — a stopped schedule is *not* loaded, not just idle.
+   or 48h expiry — a stopped schedule is *not* loaded, not just idle.
 2. **`com.sbecker11.recruiting-automation-login-check`** (added
    2026-07-13) — `RunAtLoad=true` **only**, no interval. Fires
    `ensure_running.sh` once per actual login/reboot. This is a safety net
@@ -148,9 +151,41 @@ Every script (`run_cycle.sh`, `install.sh`, `status.sh`, `stop.sh`,
 from `RECRUITING_AUTOMATION_*` environment variables, each defaulting to the
 real production value when unset — so normal use is completely unaffected,
 but `tests/` can point every one of them at a throwaway sandbox instead and
-never touch the real `HALT` sentinel, the real 36-hour window, the real
+never touch the real `HALT` sentinel, the real 48-hour window, the real
 LaunchAgent, or make a live Gmail/Anthropic call. See `tests/README.md` for
 exactly what's covered and how the isolation works.
+
+### `RECRUITING_AUTOMATION_WORKSPACE_ROOT` — single source of truth for the parent dir
+
+All five scripts above, plus `job_tracker/__init__.py` and
+`classifier/__init__.py` in the sibling repos, independently needed to know
+where `~/workspace-recruiting-automation/` (the shared parent holding all
+three sibling repos) lives — before 2026-07-15 that was five separate
+hardcoded `$HOME/workspace-recruiting-automation/...` defaults in the shell
+scripts plus two independently-counted `Path(__file__).resolve().parents[N]`
+computations in the Python packages. Renaming or relocating the workspace
+meant hunting down and updating all seven.
+
+Now there's one override point: set `RECRUITING_AUTOMATION_WORKSPACE_ROOT`
+(as a real exported env var, e.g. in `~/.zshrc`, or per-invocation) to
+change the parent directory everywhere at once. Precedence, same pattern as
+every other `RECRUITING_AUTOMATION_*` var here:
+
+1. The more specific var, if set directly (`RECRUITING_AUTOMATION_BASE`,
+   `RECRUITING_AUTOMATION_COMMS_REPO`, `RECRUITING_AUTOMATION_JOBTRACKER_REPO`)
+   — this is what every existing test does, so test isolation is unaffected.
+2. `RECRUITING_AUTOMATION_WORKSPACE_ROOT`, if set — every script derives its
+   own default (`$WORKSPACE_ROOT/recruiting-automation`, `.../comms-migration`,
+   `.../job-tracker`) from it.
+3. The hardcoded fallback, `$HOME/workspace-recruiting-automation`.
+
+`run_cycle.sh` and `status.sh` (the two scripts that spawn Python
+subprocesses into the sibling repos) `export` the resolved value as
+`RECRUITING_AUTOMATION_WORKSPACE_ROOT` before invoking them, so an override
+set on the shell script's own invocation reaches `job_tracker/__init__.py` /
+`classifier/__init__.py` too — both check the same env var before falling
+back to their own file-relative derivation (`_PROJECT_ROOT_ENV.parent.parent`,
+which itself no longer needs a second independently-counted `parents[N]`).
 
 ## OAuth token expiry (resolved 2026-07-13)
 
@@ -164,14 +199,32 @@ and the account/scope table live in `comms-migration`'s README
 ("Re-authenticating when a login expires"). Should not recur; if it does,
 that section explains what to check first.
 
+## Shared config across sibling repos
+
+`~/workspace-recruiting-automation/.env` (not tracked by any git repo — that
+parent directory isn't one) holds the single copy of `ANTHROPIC_API_KEY`
+used by both `job-tracker` and `comms-migration`, instead of duplicating the
+same key in each repo's own `.env`. Each repo's own `.env` still wins if it
+sets the key locally (see `job_tracker/__init__.py` /
+`classifier/__init__.py`'s load order) — only fall back there if you
+genuinely want one repo using a different key than the other. Both repos
+print a one-line diagnostic at import time (`[job_tracker] ANTHROPIC_API_KEY:
+loaded from shared .env (...) (108 chars).` or a `WARNING: ... is not set`
+if neither file nor the shell environment has it) — this shows up in every
+`run-*.log` automatically, and `status.sh` also checks it directly.
+
 ## Common tasks
 
 ```bash
-./status.sh              # health check
-./install.sh              # (re)start a fresh 36h window, clearing any halt
-./install.sh 72           # same, but a 72-hour window instead of the 36h default
+./status.sh              # full health check: loaded/halted/expiry, install
+                          # history, recent cycle outcomes, sibling API-key
+                          # status, latest log tail
+./install.sh              # (re)start a fresh window, clearing any halt
+                          # (WINDOW_HOURS from .env if present, else 48h)
+./install.sh 72           # same, but a 72-hour window — CLI arg always wins over .env
 ./stop.sh                 # stop early on purpose
 tail -f logs/run-*.log    # follow the current/latest cycle live
+tail logs/install.log     # history of every (re)install: when, what window, why
 ```
 
 ## Known pending work (not yet built)

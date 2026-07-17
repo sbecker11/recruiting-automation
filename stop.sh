@@ -1,10 +1,13 @@
 #!/bin/zsh
-# Manually stop the recruiting automation early (before the 36h window or a halt fires on its own).
+# Manually stop the recruiting automation early (before the 48h window or a halt fires on its own).
 #
 # RECRUITING_AUTOMATION_* env vars are test-only overrides (see tests/).
 set -uo pipefail
 
-BASE="${RECRUITING_AUTOMATION_BASE:-$HOME/workspace-recruiting-automation/recruiting-automation}"
+# See install.sh's comment on WORKSPACE_ROOT — single source of truth for
+# the sibling-repos parent dir, shared across every script here.
+WORKSPACE_ROOT="${RECRUITING_AUTOMATION_WORKSPACE_ROOT:-$HOME/workspace-recruiting-automation}"
+BASE="${RECRUITING_AUTOMATION_BASE:-$WORKSPACE_ROOT/recruiting-automation}"
 PLIST_LABEL="${RECRUITING_AUTOMATION_PLIST_LABEL:-com.sbecker11.recruiting-automation}"
 PLIST_PATH="${RECRUITING_AUTOMATION_PLIST_PATH:-$HOME/Library/LaunchAgents/$PLIST_LABEL.plist}"
 

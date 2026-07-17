@@ -11,7 +11,7 @@
 # Expects these variables already set by the caller before sourcing:
 #   LOG                - path to this cycle's log file (must exist/be creatable)
 #   HALT_FILE          - sentinel path
-#   EXPIRY_FILE        - 36h-window expiry-epoch path
+#   EXPIRY_FILE        - 48h-window expiry-epoch path
 #   PLIST_LABEL        - launchd label to unload on halt/expiry
 #   PLIST_PATH         - path to that label's plist (unload fallback)
 #   STEP_TIMEOUT_SECS  - per-step timeout in seconds
@@ -68,8 +68,8 @@ preflight_check() {
     now_epoch=$(date +%s)
     expiry_epoch=$(cat "$EXPIRY_FILE")
     if (( now_epoch >= expiry_epoch )); then
-      log "36-hour window has expired (expiry was $(date -r "$expiry_epoch" 2>/dev/null || echo "$expiry_epoch"))."
-      stop_schedule "36-hour window complete — ready for Monday triage."
+      log "48-hour window has expired (expiry was $(date -r "$expiry_epoch" 2>/dev/null || echo "$expiry_epoch"))."
+      stop_schedule "48-hour window complete — ready for Monday triage."
     fi
   fi
 }

@@ -1,6 +1,6 @@
 #!/bin/zsh
 #
-# One tick of the 36-hour recruiting automation window:
+# One tick of the 48-hour recruiting automation window:
 #   comms-migration classify (personal_hub, then recruiting_funnel, live+LLM fallback)
 #   -> job-tracker triage_recruiter_inbox.py (live, LLM eval + generation on pursue)
 #   -> job-tracker render_pending_actions.py (static HTML refresh)
@@ -9,7 +9,7 @@
 # out so tests/*.bats can exercise it in isolation):
 #   - Every step runs in sequence; the FIRST non-zero exit halts the whole
 #     cycle immediately (remaining steps in this tick are skipped).
-#   - On halt (error) or once the 36-hour window has expired, this script
+#   - On halt (error) or once the 48-hour window has expired, this script
 #     writes/finds a sentinel and unloads its own LaunchAgent so the hourly
 #     schedule stops calling it — no silent retries, no runaway spend.
 #   - Every tick's full output is captured to its own timestamped log file
@@ -21,7 +21,16 @@
 
 set -uo pipefail
 
-BASE="${RECRUITING_AUTOMATION_BASE:-$HOME/workspace-recruiting-automation/recruiting-automation}"
+# See install.sh's comment on WORKSPACE_ROOT — single source of truth for
+# the sibling-repos parent dir, shared across every script here. Exported
+# (not just set) so it also reaches the comms-migration/job-tracker Python
+# subprocesses run_step invokes below — both packages' __init__.py check
+# this same var before falling back to their own file-relative derivation,
+# so a WORKSPACE_ROOT override here stays consistent end-to-end rather than
+# only affecting which repo run_cycle.sh itself calls into.
+WORKSPACE_ROOT="${RECRUITING_AUTOMATION_WORKSPACE_ROOT:-$HOME/workspace-recruiting-automation}"
+export RECRUITING_AUTOMATION_WORKSPACE_ROOT="$WORKSPACE_ROOT"
+BASE="${RECRUITING_AUTOMATION_BASE:-$WORKSPACE_ROOT/recruiting-automation}"
 STATE_DIR="$BASE/state"
 LOGS_DIR="$BASE/logs"
 HALT_FILE="$STATE_DIR/HALT"
@@ -29,8 +38,8 @@ EXPIRY_FILE="$STATE_DIR/expiry_epoch"
 PLIST_LABEL="${RECRUITING_AUTOMATION_PLIST_LABEL:-com.sbecker11.recruiting-automation}"
 PLIST_PATH="${RECRUITING_AUTOMATION_PLIST_PATH:-$HOME/Library/LaunchAgents/$PLIST_LABEL.plist}"
 
-COMMS_REPO="${RECRUITING_AUTOMATION_COMMS_REPO:-$HOME/workspace-recruiting-automation/comms-migration}"
-JOBTRACKER_REPO="${RECRUITING_AUTOMATION_JOBTRACKER_REPO:-$HOME/workspace-recruiting-automation/job-tracker}"
+COMMS_REPO="${RECRUITING_AUTOMATION_COMMS_REPO:-$WORKSPACE_ROOT/comms-migration}"
+JOBTRACKER_REPO="${RECRUITING_AUTOMATION_JOBTRACKER_REPO:-$WORKSPACE_ROOT/job-tracker}"
 
 mkdir -p "$LOGS_DIR" "$STATE_DIR"
 

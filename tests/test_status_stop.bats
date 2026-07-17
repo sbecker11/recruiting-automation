@@ -12,6 +12,11 @@ setup() {
   PLIST_LABEL="com.sbecker11.recruiting-automation-TEST-$$"
   PLIST_PATH="$TEST_DIR/fake.plist"
   REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
+  # Deliberately nonexistent — status.sh's ANTHROPIC_API_KEY section must
+  # degrade to "no .venv found — skipped" for these rather than ever
+  # touching the real job-tracker/comms-migration repos or their venvs.
+  FAKE_COMMS_REPO="$TEST_DIR/no-such-comms-migration"
+  FAKE_JOBTRACKER_REPO="$TEST_DIR/no-such-job-tracker"
 }
 
 teardown() {
@@ -19,7 +24,11 @@ teardown() {
 }
 
 run_status() {
-  run env RECRUITING_AUTOMATION_BASE="$BASE" RECRUITING_AUTOMATION_PLIST_LABEL="$PLIST_LABEL" \
+  run env \
+    RECRUITING_AUTOMATION_BASE="$BASE" \
+    RECRUITING_AUTOMATION_PLIST_LABEL="$PLIST_LABEL" \
+    RECRUITING_AUTOMATION_COMMS_REPO="$FAKE_COMMS_REPO" \
+    RECRUITING_AUTOMATION_JOBTRACKER_REPO="$FAKE_JOBTRACKER_REPO" \
     "$REPO_ROOT/status.sh"
 }
 
@@ -58,6 +67,48 @@ run_stop() {
   run_status
   [ "$status" -eq 0 ]
   [[ "$output" == *"no logs yet"* ]]
+}
+
+@test "status.sh reports the configured window length alongside remaining time" {
+  echo "$(( $(date +%s) + 7200 ))" > "$BASE/state/expiry_epoch"
+  echo "48" > "$BASE/state/window_hours"
+  run_status
+  [[ "$output" == *"configured window: 48h"* ]]
+}
+
+@test "status.sh reports install history from install.log" {
+  echo '[2026-07-15 16:00:00 -0600] window=48h source="CLI arg" expiry="Fri Jul 17" reason="manual/direct invocation" pid=1234' > "$BASE/logs/install.log"
+  run_status
+  [[ "$output" == *"install history"* ]]
+  [[ "$output" == *"window=48h source=\"CLI arg\""* ]]
+}
+
+@test "status.sh reports '(no installs recorded yet)' when install.log is absent" {
+  run_status
+  [[ "$output" == *"(no installs recorded yet)"* ]]
+}
+
+@test "status.sh classifies a completed cycle log as OK" {
+  cat > "$BASE/logs/run-20260101-000000.log" <<'LOG'
+[2026-01-01 00:00:00 -0600] === Cycle start ===
+[2026-01-01 00:00:01 -0600] === Cycle complete ===
+LOG
+  run_status
+  [[ "$output" == *"run-20260101-000000.log: OK"* ]]
+}
+
+@test "status.sh classifies a stopped cycle log with its stop reason" {
+  cat > "$BASE/logs/run-20260101-010000.log" <<'LOG'
+[2026-01-01 01:00:00 -0600] === Cycle start ===
+[2026-01-01 01:00:01 -0600] STOPPING SCHEDULE: 48-hour window complete — ready for Monday triage.
+LOG
+  run_status
+  [[ "$output" == *"run-20260101-010000.log: STOPPED: 48-hour window complete"* ]]
+}
+
+@test "status.sh skips the ANTHROPIC_API_KEY check for a nonexistent sibling repo" {
+  run_status
+  [[ "$output" == *"no .venv found"* ]]
 }
 
 @test "stop.sh writes a HALT sentinel with a timestamp" {

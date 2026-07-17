@@ -81,7 +81,7 @@ run_in_sandbox() {
   run_in_sandbox "preflight_check; echo REACHED_AFTER_PREFLIGHT"
   [ "$status" -eq 1 ]
   [[ "$output" != *"REACHED_AFTER_PREFLIGHT"* ]]
-  [[ "$output" == *"36-hour window has expired"* ]]
+  [[ "$output" == *"48-hour window has expired"* ]]
 }
 
 @test "preflight_check proceeds when the expiry window has NOT passed yet" {

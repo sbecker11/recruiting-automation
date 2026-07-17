@@ -1,5 +1,9 @@
 .DS_Store
 
+# Local schedule config (WINDOW_HOURS override) — no secrets, but personal
+# preference shouldn't show up as a tracked-file diff. See .env.example.
+.env
+
 # Real personal data: email subjects/senders, LLM cost/category breakdowns,
 # job-lead details from every cycle. Never committed, especially since this
 # repo is public.
