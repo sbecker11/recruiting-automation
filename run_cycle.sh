@@ -76,6 +76,17 @@ run_step "comms-migration: classify recruiting_funnel (live, LLM fallback defaul
 run_step "job-tracker: triage_recruiter_inbox (live, LLM eval + llm-fallback extraction + auto-generate on pursue)" \
   zsh -c "cd '$JOBTRACKER_REPO' && source .venv/bin/activate && exec python3 scripts/triage_recruiter_inbox.py --llm-fallback --limit 100"
 
+# Archives the recruiter/LinkedIn traffic the step above never sees (mail
+# comms-migration deliberately routes to Category/social instead of
+# Category/recruiter_job — see scan_communications.py's module docstring
+# for the 2026-07-17 incident that motivated this). --include-sent is Tier-1
+# (thread id / known contact) only, never bills an LLM call, so it's safe to
+# run every cycle; --llm-fallback on the inbound side is opt-in-but-on here
+# since a haiku-tier cached-by-message_id call is cheap relative to the cost
+# of a real reply sitting untracked.
+run_step "job-tracker: scan_communications (LinkedIn replies + Sent-folder thread matches)" \
+  zsh -c "cd '$JOBTRACKER_REPO' && source .venv/bin/activate && exec python3 scripts/scan_communications.py --llm-fallback --include-sent --newer-than 3"
+
 run_step "job-tracker: render_pending_actions" \
   zsh -c "cd '$JOBTRACKER_REPO' && source .venv/bin/activate && exec python3 scripts/render_pending_actions.py"
 
