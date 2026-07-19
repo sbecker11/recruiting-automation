@@ -4,6 +4,7 @@
 #   comms-migration classify (personal_hub, then recruiting_funnel, live+LLM fallback)
 #   -> job-tracker triage_recruiter_inbox.py (live, LLM eval + generation on pursue)
 #   -> job-tracker scan_communications.py (LinkedIn replies + Sent-folder matches)
+#   -> job-tracker process_awaiting_llm_review.py (full-LLM-review sweep for stuck leads)
 #   -> job-tracker resync_labels.py (re-sync stale JobTracker/* labels)
 #   -> job-tracker render_pending_actions.py (static HTML refresh)
 #
@@ -97,6 +98,20 @@ run_step "job-tracker: triage_recruiter_inbox (live, LLM eval + llm-fallback ext
 # of a real reply sitting untracked.
 run_step "job-tracker: scan_communications (LinkedIn replies + Sent-folder thread matches)" \
   zsh -c "cd '$JOBTRACKER_REPO' && source .venv/bin/activate && exec python3 scripts/scan_communications.py --llm-fallback --include-sent --newer-than 3"
+
+# Closes the "Awaiting full-LLM-review" loop (2026-07-19) — leads whose free
+# rule-based score already cleared the LLM-review gate but never got the
+# real LLM call, most commonly scan_communications's own stub leads (that
+# step deliberately stops at a rule-based score only, see its "No happy
+# path" docstring) but also any digest lead the LLM call hadn't reached yet
+# at initial triage. Verified live: 21 leads sitting in this exact state,
+# several 12+ days old, with nothing in this cycle ever revisiting them
+# before this step existed. Runs the same apply_package.py two-tier
+# pipeline per lead (full review always, résumé+cover-letter only on an
+# actual "pursue"), so cost is bounded by however many leads are actually
+# eligible, not a flat rate — see cli/process_awaiting_llm_review.py.
+run_step "job-tracker: process_awaiting_llm_review (full-LLM-review sweep for leads stuck past the score gate)" \
+  zsh -c "cd '$JOBTRACKER_REPO' && source .venv/bin/activate && exec python3 scripts/process_awaiting_llm_review.py"
 
 # Re-syncs each already-triaged message's JobTracker/PURSUE|SKIP|
 # NEEDS_REVIEW label to its lead(s)' CURRENT verdict (2026-07-19) — without

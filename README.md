@@ -19,6 +19,14 @@ job-tracker: scan_communications.py          (archives LinkedIn Category/social
                                                them JobTracker/Linked or
                                                JobTracker/NeedsFollowup)
         ↓
+job-tracker: process_awaiting_llm_review.py  (sweeps leads whose free score
+                                               cleared the LLM-review gate but
+                                               never got a real LLM call —
+                                               most often scan_communications'
+                                               own stub leads; runs the same
+                                               two-tier review apply_package.py
+                                               runs by hand)
+        ↓
 job-tracker: resync_labels.py                (re-syncs any JobTracker/PURSUE|
                                                SKIP|NEEDS_REVIEW label that's
                                                gone stale since initial triage)
@@ -93,7 +101,7 @@ whether it's actually needed.
 | `state/HALT` | Sentinel file. Presence means the schedule is stopped and `run_cycle.sh` will no-op + unload itself on its next tick if somehow still loaded. Cleared automatically by `install.sh`/`ensure_running.sh`. |
 | `state/expiry_epoch` | Unix epoch when the current window ends. Written by `install.sh`. On expiry, `run_cycle.sh` stops itself with reason "ready for Monday triage" — this is a deliberate design (forces a periodic manual check-in), not a bug; re-run `install.sh` to start a fresh window. |
 | `state/window_hours` | The `WINDOW_HOURS` value `install.sh` actually used to compute the expiry above — lets `status.sh` show the configured length, not just time remaining. |
-| `logs/run-*.log` | One timestamped log per cycle tick, full output of all 6 steps. |
+| `logs/run-*.log` | One timestamped log per cycle tick, full output of all 7 steps. |
 | `logs/login-check.log` | `ensure_running.sh`'s own log (one line per login: no-op, or "restarting" with a reason). |
 | `logs/install.log` | Durable one-line-per-run history of every `install.sh` invocation (added 2026-07-15): timestamp, `WINDOW_HOURS` used, its source (CLI arg / `.env` / hardcoded default), resulting expiry, and *why* — `ensure_running.sh` passes its own restart reason through via `RECRUITING_AUTOMATION_INSTALL_REASON` so a login-triggered restart shows up distinctly from a manual one. Unlike `install.sh`'s own `echo` output (only captured when invoked through `ensure_running.sh`, lost otherwise), this always persists regardless of how `install.sh` was invoked. |
 | `logs/launchd.{out,err}.log` | Raw launchd stdout/stderr for the main agent (usually empty/redundant with `run-*.log`, since `run_cycle.sh` does its own logging+`tee`). |
