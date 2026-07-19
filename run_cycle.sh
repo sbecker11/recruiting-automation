@@ -3,6 +3,8 @@
 # One tick of the 48-hour recruiting automation window:
 #   comms-migration classify (personal_hub, then recruiting_funnel, live+LLM fallback)
 #   -> job-tracker triage_recruiter_inbox.py (live, LLM eval + generation on pursue)
+#   -> job-tracker scan_communications.py (LinkedIn replies + Sent-folder matches)
+#   -> job-tracker resync_labels.py (re-sync stale JobTracker/* labels)
 #   -> job-tracker render_pending_actions.py (static HTML refresh)
 #
 # Safety behavior (see lib/cycle_safety.sh for the implementation, factored
@@ -95,6 +97,16 @@ run_step "job-tracker: triage_recruiter_inbox (live, LLM eval + llm-fallback ext
 # of a real reply sitting untracked.
 run_step "job-tracker: scan_communications (LinkedIn replies + Sent-folder thread matches)" \
   zsh -c "cd '$JOBTRACKER_REPO' && source .venv/bin/activate && exec python3 scripts/scan_communications.py --llm-fallback --include-sent --newer-than 3"
+
+# Re-syncs each already-triaged message's JobTracker/PURSUE|SKIP|
+# NEEDS_REVIEW label to its lead(s)' CURRENT verdict (2026-07-19) — without
+# this, a label frozen at initial-triage time silently goes stale the moment
+# a later full-LLM-review or manual status change disagrees with it, which
+# defeats the point of trusting Gmail's own label state at all. Pure label
+# swap (no re-evaluation, no LLM spend, no INBOX/archive changes) — cheap
+# enough to run every cycle. See cli/resync_labels.py's module docstring.
+run_step "job-tracker: resync_labels (re-sync stale JobTracker/* labels to current verdicts)" \
+  zsh -c "cd '$JOBTRACKER_REPO' && source .venv/bin/activate && exec python3 scripts/resync_labels.py"
 
 run_step "job-tracker: render_pending_actions" \
   zsh -c "cd '$JOBTRACKER_REPO' && source .venv/bin/activate && exec python3 scripts/render_pending_actions.py"
