@@ -82,10 +82,17 @@ run_step() {
   else
     local rc=$?
     if (( rc == 124 )); then
-      log "TIMED OUT: $desc (>${STEP_TIMEOUT_SECS}s — likely stuck waiting on an interactive OAuth login)"
-      echo "$desc timed out after ${STEP_TIMEOUT_SECS}s at $(date +"%Y-%m-%d %H:%M:%S %z") — likely needs manual Google re-auth. See $LOG" > "$HALT_FILE"
-      notify "Recruiting automation: step timed out" "$desc — likely needs manual Google sign-in. Schedule halted."
-      stop_schedule "$desc timed out (likely needs manual OAuth re-auth)"
+      # 2026-07-18: don't over-commit to "OAuth" as the diagnosis — a real
+      # timeout that day turned out to be an unusually heavy batch of
+      # multi-JD digest emails (many serial LLM calls), not a stuck login;
+      # Gmail auth checked out fine seconds later. Both are plausible, so
+      # the message names both instead of pointing straight at re-auth —
+      # check this cycle's log for `[llm ...]` call lines still in progress
+      # near the ${STEP_TIMEOUT_SECS}s mark before assuming it's auth.
+      log "TIMED OUT: $desc (>${STEP_TIMEOUT_SECS}s — could be a stuck interactive OAuth login, or just an unusually heavy LLM batch; check the log before assuming re-auth)"
+      echo "$desc timed out after ${STEP_TIMEOUT_SECS}s at $(date +"%Y-%m-%d %H:%M:%S %z") — could be a stuck Google login OR just a heavy batch of LLM calls; check $LOG's last few [llm ...] lines before assuming re-auth is needed." > "$HALT_FILE"
+      notify "Recruiting automation: step timed out" "$desc — could be a stuck Google sign-in or just a heavy batch. Check the log. Schedule halted."
+      stop_schedule "$desc timed out (check log: stuck OAuth login, or just a heavy LLM batch)"
     fi
     log "FAILED: $desc (exit $rc)"
     echo "$desc failed (exit $rc) at $(date +"%Y-%m-%d %H:%M:%S %z") — see $LOG" > "$HALT_FILE"

@@ -99,11 +99,20 @@ Check both are loaded: `launchctl print "gui/$(id -u)/com.sbecker11.recruiting-a
 
 ## Safety behavior in `run_cycle.sh`
 
-- **Per-step timeout (900s / 15min)**, via `/usr/local/bin/timeout`. Guards
-  against a step *hanging* (e.g. a stuck interactive OAuth prompt nobody's
-  there to complete) rather than failing outright — without this, a hang
-  wouldn't trip the halt-on-error logic below at all, it'd just silently
-  freeze the schedule for the rest of the window.
+- **Per-step timeout (1800s / 30min, raised from 900s/15min on 2026-07-18)**,
+  via `/usr/local/bin/timeout`. Guards against a step *hanging* (e.g. a stuck
+  interactive OAuth prompt nobody's there to complete) rather than failing
+  outright — without this, a hang wouldn't trip the halt-on-error logic below
+  at all, it'd just silently freeze the schedule for the rest of the window.
+  Raised because a real production run legitimately needed more than 900s
+  (several dense multi-JD digest emails in one hour, each needing its own
+  chain of extract/evaluate/generate LLM calls) and got killed as a false
+  positive — every other cycle that week finished in 1-60s, and 1800s still
+  leaves comfortable margin under the hourly `StartInterval` (3600s), so
+  there's no risk of two cycles overlapping. The halt message on a timeout
+  deliberately no longer assumes OAuth is the cause — check the cycle's log
+  for `[llm ...]` call lines still in progress near the timeout mark before
+  spending time on a re-auth that may not be needed.
 - **Halt-on-first-failure, no retry.** The first non-zero exit (or timeout)
   in a cycle writes `state/HALT`, sends a desktop notification, unloads the
   LaunchAgent, and stops — remaining steps in that tick are skipped, and the

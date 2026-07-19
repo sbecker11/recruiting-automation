@@ -51,7 +51,16 @@ touch "$LOG"
 # login that nobody unattended can complete) rather than failing outright.
 # Without this, a hang wouldn't trip the halt-on-error logic below at all —
 # it would just silently freeze the schedule for the rest of the window.
-STEP_TIMEOUT_SECS="${RECRUITING_AUTOMATION_STEP_TIMEOUT_SECS:-900}"
+#
+# Raised 900s -> 1800s (2026-07-18): a real production run legitimately took
+# the full 900s and got killed mid-batch — several dense multi-JD digest
+# emails in one hour, each needing its own chain of extract/evaluate/generate
+# LLM calls, not a stuck OAuth prompt (verified live: Gmail auth succeeded in
+# ~2s immediately after). Every other cycle in the surrounding week finished
+# in 1-60s, so 1800s still leaves ample margin under the hourly StartInterval
+# (3600s) — no risk of two cycles overlapping — while giving a legitimately
+# heavy batch enough runway not to trip a false-positive halt.
+STEP_TIMEOUT_SECS="${RECRUITING_AUTOMATION_STEP_TIMEOUT_SECS:-1800}"
 TIMEOUT_BIN="/usr/local/bin/timeout"
 
 SCRIPT_DIR="${0:A:h}"
