@@ -6,7 +6,11 @@ unattended, scheduled pipeline:
 ```
 comms-migration: classify personal_hub      (label + archive recruiter_job etc.)
         ↓
-comms-migration: classify recruiting_funnel (same, full category taxonomy)
+comms-migration: classify recruiting_funnel (same, full category taxonomy,
+                                               plus a Spam-folder sweep —
+                                               rules + high-confidence-only
+                                               LLM, rescuing only confirmed
+                                               recruiter_job mail out of Spam)
         ↓
 job-tracker: triage_recruiter_inbox.py       (LLM eval + résumé/cover-letter
                                                generation on a "pursue" verdict;

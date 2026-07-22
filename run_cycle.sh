@@ -1,7 +1,7 @@
 #!/bin/zsh
 #
 # One tick of the 48-hour recruiting automation window:
-#   comms-migration classify (personal_hub, then recruiting_funnel, live+LLM fallback)
+#   comms-migration classify (personal_hub, then recruiting_funnel w/ spam sweep, live+LLM fallback)
 #   -> job-tracker triage_recruiter_inbox.py (live, LLM eval + generation on pursue)
 #   -> job-tracker scan_communications.py (LinkedIn replies + Sent-folder matches)
 #   -> job-tracker process_awaiting_llm_review.py (full-LLM-review sweep for stuck leads)
@@ -82,8 +82,32 @@ log "=== Cycle start ==="
 run_step "comms-migration: classify personal_hub (live, LLM fallback default-on)" \
   zsh -c "cd '$COMMS_REPO' && source .venv/bin/activate && exec python3 scripts/run_classifier.py --account personal_hub --limit 300"
 
-run_step "comms-migration: classify recruiting_funnel (live, LLM fallback default-on)" \
-  zsh -c "cd '$COMMS_REPO' && source .venv/bin/activate && exec python3 scripts/run_classifier.py --account recruiting_funnel --limit 300"
+# --include-spam (2026-07-21): verified live that a real recruiter's JD
+# email (CRB Workforce, re: DIRECTV) landed in Spam and sat invisible to
+# every part of this pipeline for a full day — Gmail search excludes
+# Spam/Trash unless asked, and this account's DEFAULT_QUERY is `in:inbox`.
+# Rules first (free), then a high-confidence-only LLM fallback (see
+# classifier/run.py's module docstring) since the motivating case came from
+# a one-off agency domain with no existing sender rule. --spam-categories
+# recruiter_job keeps the automated sweep from also pulling political/ai/
+# spam_unknown mail out of Spam just because it was confidently
+# classifiable as *something* — only mail this pipeline actually cares
+# about gets rescued. Each spam message is only ever classified once
+# (classifier/spam_sweep_state.py), so recurring cost is bounded by new
+# spam volume, not by re-scanning an unchanged backlog every hour.
+#
+# --spam-limit 100 (added 2026-07-22, after this exact step timed out and
+# unloaded its own LaunchAgent the first time it ran unbounded): with no
+# limit, the very first sweep hit the *entire* unresolved Spam backlog
+# (834 LLM calls) and blew straight through the 1800s step timeout below.
+# The normal (no-spam) version of this same step usually finishes in
+# ~10-15s (steady-state inbox volume is low), so 100 spam messages/cycle
+# (~a few minutes worst-case, at ~2s/LLM-call) leaves a wide safety margin
+# while still working through even a large backlog within a handful of
+# hourly cycles — the persistent seen-cache means nothing already-scanned
+# gets re-billed on the next cycle.
+run_step "comms-migration: classify recruiting_funnel (live, LLM fallback default-on, spam sweep)" \
+  zsh -c "cd '$COMMS_REPO' && source .venv/bin/activate && exec python3 scripts/run_classifier.py --account recruiting_funnel --limit 300 --include-spam --spam-limit 100 --spam-categories recruiter_job"
 
 run_step "job-tracker: triage_recruiter_inbox (live, LLM eval + llm-fallback extraction + auto-generate on pursue)" \
   zsh -c "cd '$JOBTRACKER_REPO' && source .venv/bin/activate && exec python3 scripts/triage_recruiter_inbox.py --llm-fallback --limit 100"
