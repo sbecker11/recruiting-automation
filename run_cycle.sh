@@ -4,6 +4,8 @@
 #   comms-migration classify (personal_hub, then recruiting_funnel w/ spam sweep, live+LLM fallback)
 #   -> job-tracker triage_recruiter_inbox.py (live, LLM eval + generation on pursue)
 #   -> job-tracker scan_communications.py (LinkedIn replies + Sent-folder matches)
+#   -> job-tracker triage_imap_inbox.py (shawn.becker@spexture.com — the Hostinger IMAP mailbox
+#      Gmail-API automation above can never see, both branches combined)
 #   -> job-tracker process_awaiting_llm_review.py (full-LLM-review sweep for stuck leads)
 #   -> job-tracker resync_labels.py (re-sync stale JobTracker/* labels)
 #   -> job-tracker render_pending_actions.py (static HTML refresh)
@@ -122,6 +124,23 @@ run_step "job-tracker: triage_recruiter_inbox (live, LLM eval + llm-fallback ext
 # of a real reply sitting untracked.
 run_step "job-tracker: scan_communications (LinkedIn replies + Sent-folder thread matches)" \
   zsh -c "cd '$JOBTRACKER_REPO' && source .venv/bin/activate && exec python3 scripts/scan_communications.py --llm-fallback --include-sent --newer-than 3"
+
+# shawn.becker@spexture.com (2026-07-22) — Hostinger-hosted plain IMAP, not
+# Gmail/Google Workspace, so none of the Gmail-API steps above can ever see
+# it. Added after a real, confirmed gap: a DIRECTV recruiter's (Cole
+# Keener) LinkedIn reply landed there and never reached
+# shawnbecker.recruiting@gmail.com at all. One script covers what the two
+# Gmail-side steps above split into two (triage_recruiter_inbox.py +
+# scan_communications.py) — see cli/triage_imap_inbox.py's module docstring.
+# --limit 30 (not the Gmail steps' 100): this mailbox's backlog runs through
+# real per-message LLM calls (extraction, and JD scoring for anything that
+# reaches triage_message), and a fresh IMAP mailbox this size has never been
+# through this pipeline before — bounding one cycle's worst case leaves
+# plenty of hourly cycles to work through the backlog without risking the
+# step timeout the Gmail spam sweep already tripped once at an unbounded
+# limit (see that step's comment above).
+run_step "job-tracker: triage_imap_inbox (shawn.becker@spexture.com, live, LLM eval + llm-fallback extraction)" \
+  zsh -c "cd '$JOBTRACKER_REPO' && source .venv/bin/activate && exec python3 scripts/triage_imap_inbox.py --imap-prefix SPEXTURE --llm-fallback --limit 30"
 
 # Closes the "Awaiting full-LLM-review" loop (2026-07-19) — leads whose free
 # rule-based score already cleared the LLM-review gate but never got the
