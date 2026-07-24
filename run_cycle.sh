@@ -115,8 +115,19 @@ run_step "comms-migration: classify personal_hub (live, LLM fallback default-on)
 run_step "comms-migration: classify recruiting_funnel (live, LLM fallback default-on, spam sweep)" \
   zsh -c "cd '$COMMS_REPO' && source .venv/bin/activate && exec python3 scripts/run_classifier.py --account recruiting_funnel --limit 300 --include-spam --spam-limit 100 --spam-categories recruiter_job"
 
+# --limit 100 -> 30 (2026-07-24, after this exact step timed out on
+# 2026-07-22 AND 2026-07-23): unlike the spam-sweep step above (cheap
+# classification-only calls, ~2s each), a message here can trigger the full
+# extract -> evaluate -> generate chain, and evaluate/generate alone each
+# routinely run 50-100s (see logs/run-20260723-115127.log). 100 messages of
+# that mix comfortably blows through the 1800s step timeout; 30 matches the
+# same reasoning already applied to the IMAP step below (--limit 30) for an
+# identical real-per-message-LLM-cost reason. processed_messages persists
+# across runs (see triage_recruiter_inbox.py's module docstring), so nothing
+# already-triaged gets skipped forever — a lower limit just spreads a heavy
+# backlog across more hourly cycles instead of risking a timeout on one.
 run_step "job-tracker: triage_recruiter_inbox (live, LLM eval + llm-fallback extraction + auto-generate on pursue)" \
-  zsh -c "cd '$JOBTRACKER_REPO' && source .venv/bin/activate && exec python3 scripts/triage_recruiter_inbox.py --llm-fallback --limit 100"
+  zsh -c "cd '$JOBTRACKER_REPO' && source .venv/bin/activate && exec python3 scripts/triage_recruiter_inbox.py --llm-fallback --limit 30"
 
 # Archives the recruiter/LinkedIn traffic the step above never sees (mail
 # comms-migration deliberately routes to Category/social instead of
