@@ -275,6 +275,11 @@ print a one-line diagnostic at import time (`[job_tracker] ANTHROPIC_API_KEY:
 loaded from shared .env (...) (108 chars).` or a `WARNING: ... is not set`
 if neither file nor the shell environment has it) — this shows up in every
 `run-*.log` automatically, and `status.sh` also checks it directly.
+`comms-migration`'s version always prints; `job_tracker`'s is opt-in via
+`JOB_TRACKER_LOG_ENV_SOURCE=1` (added 2026-07-24, quiet by default so it
+doesn't spam every interactive CLI command like `list_leads`/`apply_package`
+— `run_cycle.sh` and `status.sh` both set the var so their own logs/output
+still get it).
 
 ## Common tasks
 

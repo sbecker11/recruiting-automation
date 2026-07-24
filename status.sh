@@ -13,6 +13,11 @@ set -uo pipefail
 # var themselves before falling back to their own file-relative derivation.
 WORKSPACE_ROOT="${RECRUITING_AUTOMATION_WORKSPACE_ROOT:-$HOME/workspace-recruiting-automation}"
 export RECRUITING_AUTOMATION_WORKSPACE_ROOT="$WORKSPACE_ROOT"
+# job_tracker's own ANTHROPIC_API_KEY-source diagnostic is opt-in (quiet for
+# interactive CLI use elsewhere — see job_tracker/__init__.py) but the health
+# check below spawns a real `import job_tracker` specifically to see that
+# line, so it needs to opt back in here too.
+export JOB_TRACKER_LOG_ENV_SOURCE=1
 BASE="${RECRUITING_AUTOMATION_BASE:-$WORKSPACE_ROOT/recruiting-automation}"
 PLIST_LABEL="${RECRUITING_AUTOMATION_PLIST_LABEL:-com.sbecker11.recruiting-automation}"
 COMMS_REPO="${RECRUITING_AUTOMATION_COMMS_REPO:-$WORKSPACE_ROOT/comms-migration}"
