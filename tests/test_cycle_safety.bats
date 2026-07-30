@@ -20,7 +20,7 @@ setup() {
   # `|| true` fallbacks) instead of ever touching production.
   PLIST_LABEL="com.sbecker11.recruiting-automation-TEST-$$"
   PLIST_PATH="$TEST_DIR/fake.plist"
-  STEP_TIMEOUT_SECS=5
+  STEP_STALL_KILL_SECS=5
   TIMEOUT_BIN="/usr/local/bin/timeout"
   REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
   touch "$LOG"
@@ -36,7 +36,7 @@ run_in_sandbox() {
   run env \
     LOG="$LOG" HALT_FILE="$HALT_FILE" EXPIRY_FILE="$EXPIRY_FILE" \
     PLIST_LABEL="$PLIST_LABEL" PLIST_PATH="$PLIST_PATH" \
-    STEP_TIMEOUT_SECS="$STEP_TIMEOUT_SECS" TIMEOUT_BIN="$TIMEOUT_BIN" \
+    STEP_STALL_KILL_SECS="$STEP_STALL_KILL_SECS" TIMEOUT_BIN="$TIMEOUT_BIN" \
     zsh -c "source '$REPO_ROOT/lib/cycle_safety.sh'; $1"
 }
 
@@ -55,7 +55,7 @@ run_in_sandbox() {
 }
 
 @test "run_step marks a timeout distinctly from a plain failure" {
-  STEP_TIMEOUT_SECS=1
+  STEP_STALL_KILL_SECS=1
   run_in_sandbox "run_step 'a slow step' sleep 5"
   [ "$status" -eq 1 ]
   [[ -f "$HALT_FILE" ]]
@@ -101,11 +101,11 @@ run_in_sandbox() {
 set -uo pipefail
 LOG="$LOG"; HALT_FILE="$HALT_FILE"; EXPIRY_FILE="$EXPIRY_FILE"
 PLIST_LABEL="$PLIST_LABEL"; PLIST_PATH="$PLIST_PATH"
-STEP_TIMEOUT_SECS=300; TIMEOUT_BIN="$TIMEOUT_BIN"
+STEP_STALL_KILL_SECS=300; TIMEOUT_BIN="$TIMEOUT_BIN"
 source "$REPO_ROOT/lib/cycle_safety.sh"
 trap shutdown_trap SIGTERM
 log "harness start"
-"\$TIMEOUT_BIN" "\$STEP_TIMEOUT_SECS" sleep 300
+"\$TIMEOUT_BIN" "\$STEP_STALL_KILL_SECS" sleep 300
 log "unreachable"
 HARNESS
   chmod +x "$TEST_DIR/harness.sh"

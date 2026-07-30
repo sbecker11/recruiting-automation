@@ -14,8 +14,8 @@
 #   EXPIRY_FILE        - 48h-window expiry-epoch path
 #   PLIST_LABEL        - launchd label to unload on halt/expiry
 #   PLIST_PATH         - path to that label's plist (unload fallback)
-#   STEP_TIMEOUT_SECS  - per-step timeout in seconds
-#   TIMEOUT_BIN        - absolute path to the `timeout` binary
+#   STEP_STALL_KILL_SECS - hard per-step kill (seconds); hang guard → HALT
+#   TIMEOUT_BIN          - absolute path to the `timeout` binary
 
 log() {
   echo "[$(date +"%Y-%m-%d %H:%M:%S %z")] $*" | tee -a "$LOG"
@@ -77,7 +77,7 @@ preflight_check() {
 run_step() {
   local desc="$1"; shift
   log "--- $desc ---"
-  if "$TIMEOUT_BIN" "$STEP_TIMEOUT_SECS" "$@" >>"$LOG" 2>&1; then
+  if "$TIMEOUT_BIN" "$STEP_STALL_KILL_SECS" "$@" >>"$LOG" 2>&1; then
     log "OK: $desc"
   else
     local rc=$?
@@ -88,9 +88,11 @@ run_step() {
       # Gmail auth checked out fine seconds later. Both are plausible, so
       # the message names both instead of pointing straight at re-auth —
       # check this cycle's log for `[llm ...]` call lines still in progress
-      # near the ${STEP_TIMEOUT_SECS}s mark before assuming it's auth.
-      log "TIMED OUT: $desc (>${STEP_TIMEOUT_SECS}s — could be a stuck interactive OAuth login, or just an unusually heavy LLM batch; check the log before assuming re-auth)"
-      echo "$desc timed out after ${STEP_TIMEOUT_SECS}s at $(date +"%Y-%m-%d %H:%M:%S %z") — could be a stuck Google login OR just a heavy batch of LLM calls; check $LOG's last few [llm ...] lines before assuming re-auth is needed." > "$HALT_FILE"
+      # near the ${STEP_STALL_KILL_SECS}s mark before assuming it's auth.
+      # 2026-07-30: triage steps also take inbox_batch_wall_budget_secs so a
+      # healthy heavy batch should exit 0 before this hard kill fires.
+      log "TIMED OUT: $desc (>${STEP_STALL_KILL_SECS}s — could be a stuck interactive OAuth login, or just an unusually heavy LLM batch; check the log before assuming re-auth)"
+      echo "$desc timed out after ${STEP_STALL_KILL_SECS}s at $(date +"%Y-%m-%d %H:%M:%S %z") — could be a stuck Google login OR just a heavy batch of LLM calls; check $LOG's last few [llm ...] lines before assuming re-auth is needed." > "$HALT_FILE"
       notify "Recruiting automation: step timed out" "$desc — could be a stuck Google sign-in or just a heavy batch. Check the log. Schedule halted."
       stop_schedule "$desc timed out (check log: stuck OAuth login, or just a heavy LLM batch)"
     fi

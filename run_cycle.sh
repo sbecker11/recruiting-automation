@@ -9,6 +9,7 @@
 #   -> job-tracker process_awaiting_llm_review.py (full-LLM-review sweep for stuck leads)
 #   -> job-tracker resync_labels.py (re-sync stale JobTracker/* labels)
 #   -> job-tracker render_pending_actions.py (static HTML refresh)
+#   -> job-tracker render_contacts.py (static contacts-lookup page refresh)
 #
 # Safety behavior (see lib/cycle_safety.sh for the implementation, factored
 # out so tests/*.bats can exercise it in isolation):
@@ -69,7 +70,12 @@ touch "$LOG"
 # in 1-60s, so 1800s still leaves ample margin under the hourly StartInterval
 # (3600s) — no risk of two cycles overlapping — while giving a legitimately
 # heavy batch enough runway not to trip a false-positive halt.
-STEP_TIMEOUT_SECS="${RECRUITING_AUTOMATION_STEP_TIMEOUT_SECS:-1800}"
+#
+# Renamed STEP_TIMEOUT_SECS -> STEP_STALL_KILL_SECS (2026-07-30): this is the
+# hard kill for a hung step (possible stuck OAuth). Busy-but-healthy triage
+# batches should stop earlier via inbox_batch_wall_budget_secs (exit 0) so
+# they never reach this kill / HALT path.
+STEP_STALL_KILL_SECS="${RECRUITING_AUTOMATION_STEP_STALL_KILL_SECS:-${RECRUITING_AUTOMATION_STEP_TIMEOUT_SECS:-1800}}"
 TIMEOUT_BIN="/usr/local/bin/timeout"
 
 SCRIPT_DIR="${0:A:h}"
@@ -115,19 +121,17 @@ run_step "comms-migration: classify personal_hub (live, LLM fallback default-on)
 run_step "comms-migration: classify recruiting_funnel (live, LLM fallback default-on, spam sweep)" \
   zsh -c "cd '$COMMS_REPO' && source .venv/bin/activate && exec python3 scripts/run_classifier.py --account recruiting_funnel --limit 300 --include-spam --spam-limit 100 --spam-categories recruiter_job"
 
-# --limit 100 -> 30 (2026-07-24, after this exact step timed out on
-# 2026-07-22 AND 2026-07-23): unlike the spam-sweep step above (cheap
-# classification-only calls, ~2s each), a message here can trigger the full
-# extract -> evaluate -> generate chain, and evaluate/generate alone each
-# routinely run 50-100s (see logs/run-20260723-115127.log). 100 messages of
-# that mix comfortably blows through the 1800s step timeout; 30 matches the
-# same reasoning already applied to the IMAP step below (--limit 30) for an
-# identical real-per-message-LLM-cost reason. processed_messages persists
-# across runs (see triage_recruiter_inbox.py's module docstring), so nothing
-# already-triaged gets skipped forever — a lower limit just spreads a heavy
-# backlog across more hourly cycles instead of risking a timeout on one.
+# Dual bound on triage (2026-07-30): inbox_batch_message_cap (was --limit;
+# 100 -> 30 on 2026-07-24) AND inbox_batch_wall_budget_secs (soft 1200s).
+# Unlike the spam-sweep step above (cheap classification-only calls, ~2s
+# each), a message here can trigger the full extract -> evaluate -> generate
+# chain, and evaluate/generate alone each routinely run 50-100s. A heavy
+# digest backlog was still blowing the hard step_stall_kill (1800s) and
+# writing HALT even while making progress (see run-20260727-141505.log).
+# The wall budget stops cleanly mid-batch (exit 0) before that kill fires;
+# processed_messages persists, so remaining mail continues next hour.
 run_step "job-tracker: triage_recruiter_inbox (live, LLM eval + llm-fallback extraction + auto-generate on pursue)" \
-  zsh -c "cd '$JOBTRACKER_REPO' && source .venv/bin/activate && exec python3 scripts/triage_recruiter_inbox.py --llm-fallback --limit 30"
+  zsh -c "cd '$JOBTRACKER_REPO' && source .venv/bin/activate && exec python3 scripts/triage_recruiter_inbox.py --llm-fallback --inbox-batch-message-cap 30 --inbox-batch-wall-budget-secs 1200"
 
 # Archives the recruiter/LinkedIn traffic the step above never sees (mail
 # comms-migration deliberately routes to Category/social instead of
@@ -147,15 +151,13 @@ run_step "job-tracker: scan_communications (LinkedIn replies + Sent-folder threa
 # shawnbecker.recruiting@gmail.com at all. One script covers what the two
 # Gmail-side steps above split into two (triage_recruiter_inbox.py +
 # scan_communications.py) — see cli/triage_imap_inbox.py's module docstring.
-# --limit 30 (not the Gmail steps' 100): this mailbox's backlog runs through
-# real per-message LLM calls (extraction, and JD scoring for anything that
-# reaches triage_message), and a fresh IMAP mailbox this size has never been
-# through this pipeline before — bounding one cycle's worst case leaves
-# plenty of hourly cycles to work through the backlog without risking the
-# step timeout the Gmail spam sweep already tripped once at an unbounded
-# limit (see that step's comment above).
+# Same dual bound as Gmail triage (message cap + wall budget): this mailbox's
+# backlog runs through real per-message LLM calls, and a fresh IMAP mailbox
+# this size has never been through this pipeline before — bounding one
+# cycle's worst case leaves plenty of hourly cycles to work through the
+# backlog without risking step_stall_kill / HALT.
 run_step "job-tracker: triage_imap_inbox (shawn.becker@spexture.com, live, LLM eval + llm-fallback extraction)" \
-  zsh -c "cd '$JOBTRACKER_REPO' && source .venv/bin/activate && exec python3 scripts/triage_imap_inbox.py --imap-prefix SPEXTURE --llm-fallback --limit 30"
+  zsh -c "cd '$JOBTRACKER_REPO' && source .venv/bin/activate && exec python3 scripts/triage_imap_inbox.py --imap-prefix SPEXTURE --llm-fallback --inbox-batch-message-cap 30 --inbox-batch-wall-budget-secs 1200"
 
 # Closes the "Awaiting full-LLM-review" loop (2026-07-19) — leads whose free
 # rule-based score already cleared the LLM-review gate but never got the
@@ -183,5 +185,8 @@ run_step "job-tracker: resync_labels (re-sync stale JobTracker/* labels to curre
 
 run_step "job-tracker: render_pending_actions" \
   zsh -c "cd '$JOBTRACKER_REPO' && source .venv/bin/activate && exec python3 scripts/render_pending_actions.py"
+
+run_step "job-tracker: render_contacts (static contacts-lookup page)" \
+  zsh -c "cd '$JOBTRACKER_REPO' && source .venv/bin/activate && exec python3 scripts/render_contacts.py"
 
 log "=== Cycle complete ==="
