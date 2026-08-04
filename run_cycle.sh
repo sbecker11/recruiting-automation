@@ -141,8 +141,21 @@ run_step "job-tracker: triage_recruiter_inbox (live, LLM eval + llm-fallback ext
 # run every cycle; --llm-fallback on the inbound side is opt-in-but-on here
 # since a haiku-tier cached-by-message_id call is cheap relative to the cost
 # of a real reply sitting untracked.
+#
+# --newer-than 14 (was 3; widened 2026-08-01): after a multi-day HALT /
+# sleep gap, a 3-day window silently missed InMails that landed during the
+# outage. is_communication_seen makes re-scanning already-handled mail cheap,
+# so the wider window is safe every cycle. install.sh also touches
+# state/linkedin_catchup_requested; when present we force 14 even if a future
+# operator narrows the default again.
+LINKEDIN_NEWER_THAN=14
+if [[ -f "$STATE_DIR/linkedin_catchup_requested" ]]; then
+  LINKEDIN_NEWER_THAN=14
+  rm -f "$STATE_DIR/linkedin_catchup_requested"
+  log "LinkedIn catch-up requested — scan_communications --newer-than $LINKEDIN_NEWER_THAN"
+fi
 run_step "job-tracker: scan_communications (LinkedIn replies + Sent-folder thread matches)" \
-  zsh -c "cd '$JOBTRACKER_REPO' && source .venv/bin/activate && exec python3 scripts/scan_communications.py --llm-fallback --include-sent --newer-than 3"
+  zsh -c "cd '$JOBTRACKER_REPO' && source .venv/bin/activate && exec python3 scripts/scan_communications.py --llm-fallback --include-sent --newer-than $LINKEDIN_NEWER_THAN"
 
 # shawn.becker@spexture.com (2026-07-22) — Hostinger-hosted plain IMAP, not
 # Gmail/Google Workspace, so none of the Gmail-API steps above can ever see
@@ -188,5 +201,11 @@ run_step "job-tracker: render_pending_actions" \
 
 run_step "job-tracker: render_contacts (static contacts-lookup page)" \
   zsh -c "cd '$JOBTRACKER_REPO' && source .venv/bin/activate && exec python3 scripts/render_contacts.py"
+
+# Durable "last successful cycle" marker (2026-08-01) — pending-actions and
+# ensure_running.sh use this to surface silent gaps (sleep/SIGTERM/HALT) where
+# the schedule looked "loaded" but nothing had completed for hours/days.
+date +%s > "$STATE_DIR/last_ok_cycle"
+rm -f "$STATE_DIR/stale_notified_at"
 
 log "=== Cycle complete ==="

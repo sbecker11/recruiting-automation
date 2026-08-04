@@ -15,6 +15,8 @@ setup() {
   LOG="$TEST_DIR/cycle.log"
   HALT_FILE="$TEST_DIR/HALT"
   EXPIRY_FILE="$TEST_DIR/expiry_epoch"
+  STATE_DIR="$TEST_DIR/state"
+  mkdir -p "$STATE_DIR"
   # A label guaranteed not to correspond to any real LaunchAgent, so
   # unload_self's launchctl calls harmlessly no-op (both already have
   # `|| true` fallbacks) instead of ever touching production.
@@ -35,8 +37,10 @@ teardown() {
 run_in_sandbox() {
   run env \
     LOG="$LOG" HALT_FILE="$HALT_FILE" EXPIRY_FILE="$EXPIRY_FILE" \
+    STATE_DIR="$STATE_DIR" \
     PLIST_LABEL="$PLIST_LABEL" PLIST_PATH="$PLIST_PATH" \
     STEP_STALL_KILL_SECS="$STEP_STALL_KILL_SECS" TIMEOUT_BIN="$TIMEOUT_BIN" \
+    RECRUITING_AUTOMATION_STALE_CYCLE_HOURS="${RECRUITING_AUTOMATION_STALE_CYCLE_HOURS:-6}" \
     zsh -c "source '$REPO_ROOT/lib/cycle_safety.sh'; $1"
 }
 
@@ -89,6 +93,16 @@ run_in_sandbox() {
   run_in_sandbox "preflight_check; echo REACHED_AFTER_PREFLIGHT"
   [ "$status" -eq 0 ]
   [[ "$output" == *"REACHED_AFTER_PREFLIGHT"* ]]
+}
+
+@test "preflight_check logs STALE when last_ok_cycle is older than threshold" {
+  echo "$(( $(date +%s) - 10 * 3600 ))" > "$STATE_DIR/last_ok_cycle"
+  RECRUITING_AUTOMATION_STALE_CYCLE_HOURS=6
+  run_in_sandbox "preflight_check; echo REACHED_AFTER_PREFLIGHT"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"REACHED_AFTER_PREFLIGHT"* ]]
+  grep -q "STALE: no successful cycle" "$LOG"
+  [[ -f "$STATE_DIR/stale_notified_at" ]]
 }
 
 @test "shutdown_trap fires on SIGTERM to the whole process tree, exits 0, writes no HALT" {

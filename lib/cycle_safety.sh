@@ -52,6 +52,41 @@ stop_schedule() {
   exit 1
 }
 
+# Hours since last successful cycle (state/last_ok_cycle) before we fire a
+# one-shot desktop notification. Covers the Jul 31→Aug 1 class of failure:
+# SIGTERM/sleep left the LaunchAgent "loaded" with no HALT file, so nothing
+# looked broken while LinkedIn InMails piled up unprocessed.
+STALE_CYCLE_HOURS="${RECRUITING_AUTOMATION_STALE_CYCLE_HOURS:-6}"
+
+notify_if_stale_cycle() {
+  # Caller must set STATE_DIR (run_cycle / ensure_running do). No-op when
+  # last_ok_cycle is missing (first install) or still fresh.
+  local last_ok_file="${STATE_DIR:-}/last_ok_cycle"
+  local notified_file="${STATE_DIR:-}/stale_notified_at"
+  [[ -n "${STATE_DIR:-}" && -f "$last_ok_file" ]] || return 0
+
+  local now_epoch last_ok age_secs stale_secs hours
+  now_epoch=$(date +%s)
+  last_ok=$(cat "$last_ok_file" 2>/dev/null) || return 0
+  [[ "$last_ok" == <-> ]] || return 0
+  age_secs=$(( now_epoch - last_ok ))
+  stale_secs=$(( STALE_CYCLE_HOURS * 3600 ))
+  (( age_secs >= stale_secs )) || return 0
+
+  # One notification per stale gap — cleared when a cycle completes OK.
+  if [[ -f "$notified_file" ]]; then
+    local already
+    already=$(cat "$notified_file" 2>/dev/null || echo "")
+    [[ "$already" == "$last_ok" ]] && return 0
+  fi
+
+  hours=$(( age_secs / 3600 ))
+  echo "$last_ok" > "$notified_file"
+  log "STALE: no successful cycle in ${hours}h (last_ok_cycle=$(date -r "$last_ok" 2>/dev/null || echo "$last_ok"))."
+  notify "Recruiting automation: schedule quiet" \
+    "No successful cycle in ${hours}h — LinkedIn/inbox triage may be behind. Check status.sh / pending-actions."
+}
+
 # Halt sentinel or expired window -> log + unload + exit 1. Only returns
 # (without exiting) when neither condition applies, letting the caller
 # proceed into its real cycle.
@@ -72,6 +107,8 @@ preflight_check() {
       stop_schedule "48-hour window complete — ready for Monday triage."
     fi
   fi
+
+  notify_if_stale_cycle
 }
 
 run_step() {

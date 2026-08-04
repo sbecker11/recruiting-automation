@@ -48,6 +48,12 @@ fi
 mkdir -p "$BASE/state" "$BASE/logs"
 rm -f "$BASE/state/HALT"
 
+# Force a wide LinkedIn InMail catch-up on the first cycle after (re)install
+# (2026-08-01) — covers mail that arrived during a HALT / sleep gap that the
+# normal hourly scan would otherwise miss if newer-than were ever narrowed.
+touch "$BASE/state/linkedin_catchup_requested"
+rm -f "$BASE/state/stale_notified_at"
+
 now_epoch=$(date +%s)
 expiry_epoch=$(( now_epoch + WINDOW_HOURS * 3600 ))
 echo "$expiry_epoch" > "$BASE/state/expiry_epoch"

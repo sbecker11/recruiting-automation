@@ -36,13 +36,19 @@ BASE="${RECRUITING_AUTOMATION_BASE:-$WORKSPACE_ROOT/recruiting-automation}"
 PLIST_LABEL="${RECRUITING_AUTOMATION_PLIST_LABEL:-com.sbecker11.recruiting-automation}"
 HALT_FILE="$BASE/state/HALT"
 EXPIRY_FILE="$BASE/state/expiry_epoch"
+STATE_DIR="$BASE/state"
 LOG="$BASE/logs/login-check.log"
 INSTALL_SCRIPT="${RECRUITING_AUTOMATION_INSTALL_SCRIPT:-$BASE/install.sh}"
+STALE_CYCLE_HOURS="${RECRUITING_AUTOMATION_STALE_CYCLE_HOURS:-6}"
 
 mkdir -p "$BASE/logs"
 
 log() {
   echo "[$(date +"%Y-%m-%d %H:%M:%S %z")] $*" >> "$LOG"
+}
+
+notify() {
+  osascript -e "display notification \"$2\" with title \"$1\"" >/dev/null 2>&1 || true
 }
 
 is_loaded() {
@@ -57,7 +63,33 @@ is_expired() {
   (( now_epoch >= expiry_epoch ))
 }
 
+# Mirror of cycle_safety.sh's notify_if_stale_cycle — kept local so this
+# login-check script does not need to source the full cycle_safety helpers
+# (TIMEOUT_BIN / HALT unload machinery). Same 6h default / one-shot notify.
+notify_if_stale_cycle() {
+  local last_ok_file="$STATE_DIR/last_ok_cycle"
+  local notified_file="$STATE_DIR/stale_notified_at"
+  [[ -f "$last_ok_file" ]] || return 0
+  local now_epoch last_ok age_secs hours
+  now_epoch=$(date +%s)
+  last_ok=$(cat "$last_ok_file" 2>/dev/null) || return 0
+  [[ "$last_ok" == <-> ]] || return 0
+  age_secs=$(( now_epoch - last_ok ))
+  (( age_secs >= STALE_CYCLE_HOURS * 3600 )) || return 0
+  if [[ -f "$notified_file" ]]; then
+    local already
+    already=$(cat "$notified_file" 2>/dev/null || echo "")
+    [[ "$already" == "$last_ok" ]] && return 0
+  fi
+  hours=$(( age_secs / 3600 ))
+  echo "$last_ok" > "$notified_file"
+  log "login check: STALE — no successful cycle in ${hours}h."
+  notify "Recruiting automation: schedule quiet" \
+    "No successful cycle in ${hours}h — LinkedIn/inbox triage may be behind. Check status.sh / pending-actions."
+}
+
 if is_loaded && [[ ! -f "$HALT_FILE" ]] && ! is_expired; then
+  notify_if_stale_cycle
   log "login check: already loaded and healthy, nothing to do."
   exit 0
 fi

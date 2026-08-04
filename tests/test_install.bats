@@ -37,6 +37,12 @@ run_install() {
   [[ ! -f "$BASE/state/HALT" ]]
 }
 
+@test "requests LinkedIn catch-up on install" {
+  run_install
+  [ "$status" -eq 0 ]
+  [[ -f "$BASE/state/linkedin_catchup_requested" ]]
+}
+
 @test "writes an expiry_epoch roughly WINDOW_HOURS from now, honoring the arg" {
   run_install 10
   [ "$status" -eq 0 ]
