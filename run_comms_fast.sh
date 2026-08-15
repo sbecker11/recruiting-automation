@@ -2,6 +2,7 @@
 # Fast lead-communications tick (every 3 minutes via LaunchAgent).
 # Scans recruiting Gmail + personal_hub + Spexture IMAP, refreshes pending-actions,
 # and fires a macOS notification when new inbound lead mail is archived.
+# Does not open a browser tab (--no-open); the already-open React UI polls JSON.
 set -uo pipefail
 
 WORKSPACE_ROOT="${RECRUITING_AUTOMATION_WORKSPACE_ROOT:-$HOME/workspace-recruiting-automation}"
@@ -23,7 +24,7 @@ LOG="$LOGS_DIR/comms_fast-$(date +%Y%m%d-%H%M%S).log"
     echo "comms_fast: python not found" >&2
     exit 1
   fi
-  "$PY" scripts/comms_fast_cycle.py
+  "$PY" scripts/comms_fast_cycle.py --no-open
   rc=$?
   echo "=== comms_fast end rc=$rc ==="
   exit $rc
