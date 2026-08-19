@@ -1,0 +1,23 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  bats:
+    name: bats test suite
+    # macos-latest (not ubuntu) because test_install.bats/test_ensure_running.bats
+    # make real launchctl bootstrap/bootout calls against a throwaway -TEST-$$
+    # label (see tests/README.md) — launchctl only exists on macOS runners.
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install bats-core
+        run: brew install bats-core
+
+      - name: Run bats test suite
+        run: bats tests/

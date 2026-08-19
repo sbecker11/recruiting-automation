@@ -93,7 +93,7 @@ whether it's actually needed.
 | File | Purpose |
 |---|---|
 | `install.sh` | Start (or restart) the automation: clears any `state/HALT`, resets the window from "now" (`WINDOW_HOURS` from `.env` if present, else 48h — a CLI arg overrides both), writes/reloads the main LaunchAgent. **Safe to re-run anytime** — this is also the fix for "the schedule stopped and I want it running again." `WINDOW_HOURS=0` disables the expiry window entirely — the schedule then runs indefinitely until `stop.sh`/`state/HALT` (added 2026-08-18 at Shawn's request; see `state/expiry_epoch` below). |
-| `.env` | Optional local override for `WINDOW_HOURS`. Git-ignored, no secrets — see `.env.example`. |
+| `.env` | Optional local override for `WINDOW_HOURS`. **git-crypt encrypted, not git-ignored** (2026-08-19) — see `.env.example` and "Decrypting `.env` on a new machine" below. Holds no secret today (just `WINDOW_HOURS`), but is encrypted for consistency with the sibling repos and in case that changes. |
 | `run_cycle.sh` | One tick of the pipeline (see diagram above). Called hourly by launchd, and once immediately on install (`RunAtLoad`). Sources `lib/cycle_safety.sh` for all the safety behavior — see below. |
 | `lib/cycle_safety.sh` | The actual halt/timeout/shutdown-trap logic, factored out of `run_cycle.sh` (2026-07-13) specifically so `tests/` can exercise it in isolation. Not meant to be run directly. |
 | `ensure_running.sh` | Runs once per login (see the login-check LaunchAgent below). If the main automation isn't loaded, or is loaded but halted, re-runs `install.sh`. No-ops otherwise. |
@@ -109,6 +109,63 @@ whether it's actually needed.
 | `logs/login-check.log` | `ensure_running.sh`'s own log (one line per login: no-op, or "restarting" with a reason). |
 | `logs/install.log` | Durable one-line-per-run history of every `install.sh` invocation (added 2026-07-15): timestamp, `WINDOW_HOURS` used, its source (CLI arg / `.env` / hardcoded default), resulting expiry, and *why* — `ensure_running.sh` passes its own restart reason through via `RECRUITING_AUTOMATION_INSTALL_REASON` so a login-triggered restart shows up distinctly from a manual one. Unlike `install.sh`'s own `echo` output (only captured when invoked through `ensure_running.sh`, lost otherwise), this always persists regardless of how `install.sh` was invoked. |
 | `logs/launchd.{out,err}.log` | Raw launchd stdout/stderr for the main agent (usually empty/redundant with `run-*.log`, since `run_cycle.sh` does its own logging+`tee`). |
+
+**`.env` is git-crypt encrypted, not git-ignored** (2026-08-19): unlike most
+repos, this `.env` is intentionally *tracked* so `WINDOW_HOURS` travels with
+the repo, but `.gitattributes` (`.env filter=git-crypt diff=git-crypt`)
+makes git transparently AES-256-encrypt it on commit and decrypt it on
+checkout — GitHub only ever stores ciphertext. On this machine that's
+already invisible (the key was registered here when git-crypt was set up),
+but a fresh clone anywhere else needs one manual step — see below.
+
+### Decrypting `.env` on a new machine
+
+On a brand-new clone of this repo (a different Mac, a CI runner, anywhere
+the key hasn't been registered yet), `.env` in the working tree is opaque
+ciphertext until unlocked:
+
+1. **Install `git-crypt`** on that machine (not needed on this one, where
+   it's already installed and registered):
+   ```bash
+   brew install git-crypt
+   ```
+2. **Get the key file there securely.** The symmetric key lives outside git
+   entirely, at `~/.git-crypt-keys/recruiting-automation.key` on this Mac
+   (`chmod 600`). Copy that exact file to the new machine through an
+   out-of-band channel you trust — an encrypted USB drive, your password
+   manager's secure file/attachment storage, or `scp` directly between two
+   machines you control over SSH. **Never** email it, commit it to any git
+   repo (this one or otherwise), or paste its contents into chat/Slack/any
+   other unencrypted channel.
+3. **Clone the repo as usual, then unlock from the repo root** with the
+   copied key file:
+   ```bash
+   git-crypt unlock /path/to/copied/recruiting-automation.key
+   ```
+   This decrypts the currently-checked-out `.env` in place and registers
+   the key with that machine's local `.git` directory, so every future
+   checkout and commit on that machine is transparent from then on.
+4. **Verify it worked:**
+   ```bash
+   git-crypt status    # "encrypted: .env" reflects .gitattributes config,
+                        # not lock state, so it prints that either way —
+                        # it's a sanity check the filter is wired up, not
+                        # proof of a successful unlock
+   cat .env             # the real proof: a readable WINDOW_HOURS=... line,
+                        # not binary garbage
+   ```
+   `git-crypt unlock` itself also fails loudly (non-zero exit, an error
+   message) if the key file is wrong or the working tree isn't clean, so a
+   silent successful return plus a readable `.env` together confirm success.
+5. **If you clone and never run `git-crypt unlock`:** this is the safe
+   default, not a bug. `.env` stays as encrypted bytes in the working tree;
+   `install.sh` falls back to its hardcoded default (48h window) instead of
+   reading `WINDOW_HOURS` — never a silent leak, never a crash.
+6. **If the key file is ever lost with no other copy, it's unrecoverable —
+   there is no backdoor.** Keep a durable backup of it (and its
+   `job-tracker.key` / `comms-migration.key` siblings) somewhere outside
+   git entirely — a password manager's secure notes/file storage, or macOS
+   Keychain, both work well.
 
 ## LaunchAgents (macOS scheduling)
 
