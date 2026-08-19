@@ -36,7 +36,9 @@ fi
 
 echo ""
 echo "--- expiry ---"
-if [[ -f "$BASE/state/expiry_epoch" ]]; then
+if [[ -f "$BASE/state/window_hours" && "$(cat "$BASE/state/window_hours")" == "0" ]]; then
+  echo "configured window: none — runs indefinitely, no forced check-in"
+elif [[ -f "$BASE/state/expiry_epoch" ]]; then
   expiry_epoch=$(cat "$BASE/state/expiry_epoch")
   now_epoch=$(date +%s)
   remaining=$(( expiry_epoch - now_epoch ))
@@ -49,6 +51,8 @@ if [[ -f "$BASE/state/expiry_epoch" ]]; then
   else
     echo "remaining: EXPIRED"
   fi
+else
+  echo "(no expiry state recorded yet — run install.sh)"
 fi
 
 echo ""

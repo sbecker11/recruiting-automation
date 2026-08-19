@@ -55,8 +55,21 @@ touch "$BASE/state/linkedin_catchup_requested"
 rm -f "$BASE/state/stale_notified_at"
 
 now_epoch=$(date +%s)
-expiry_epoch=$(( now_epoch + WINDOW_HOURS * 3600 ))
-echo "$expiry_epoch" > "$BASE/state/expiry_epoch"
+# WINDOW_HOURS=0 means "no expiry — run indefinitely" (added 2026-08-18 at
+# Shawn's explicit request to remove the forced periodic-check-in window).
+# preflight_check() in lib/cycle_safety.sh only checks expiry at all when
+# $EXPIRY_FILE exists, so the clean way to disable it is to just not write
+# one — no new skip-logic needed there. Any expiry_epoch left over from a
+# previous finite-window install is removed so a stale file can't still
+# expire the schedule later.
+if [[ "$WINDOW_HOURS" == "0" ]]; then
+  rm -f "$BASE/state/expiry_epoch"
+  expiry_display="none (runs indefinitely — no forced check-in)"
+else
+  expiry_epoch=$(( now_epoch + WINDOW_HOURS * 3600 ))
+  echo "$expiry_epoch" > "$BASE/state/expiry_epoch"
+  expiry_display="$(date -r "$expiry_epoch")"
+fi
 echo "$WINDOW_HOURS" > "$BASE/state/window_hours"
 
 cat > "$PLIST_PATH" <<PLIST
@@ -92,10 +105,14 @@ launchctl bootstrap "gui/$(id -u)" "$PLIST_PATH"
 # many times has this window been reset, when, to what length, and why" a
 # quick `tail logs/install.log` instead of cross-referencing timestamps
 # across login-check.log/run-*.log/state/ by hand.
-echo "[$(date +"%Y-%m-%d %H:%M:%S %z")] window=${WINDOW_HOURS}h source=\"$WINDOW_SOURCE\" expiry=\"$(date -r "$expiry_epoch")\" reason=\"${RECRUITING_AUTOMATION_INSTALL_REASON:-manual/direct invocation}\" pid=$$" >> "$BASE/logs/install.log"
+echo "[$(date +"%Y-%m-%d %H:%M:%S %z")] window=${WINDOW_HOURS}h source=\"$WINDOW_SOURCE\" expiry=\"$expiry_display\" reason=\"${RECRUITING_AUTOMATION_INSTALL_REASON:-manual/direct invocation}\" pid=$$" >> "$BASE/logs/install.log"
 
 echo "Installed and loaded $PLIST_LABEL."
-echo "Window: $WINDOW_HOURS hours (source: $WINDOW_SOURCE), expires $(date -r "$expiry_epoch")."
+if [[ "$WINDOW_HOURS" == "0" ]]; then
+  echo "Window: none (source: $WINDOW_SOURCE) — runs indefinitely, no forced check-in."
+else
+  echo "Window: $WINDOW_HOURS hours (source: $WINDOW_SOURCE), expires $expiry_display."
+fi
 echo "First cycle runs immediately (RunAtLoad), then hourly."
 echo "Status:  $BASE/status.sh"
 echo "Stop early: $BASE/stop.sh"

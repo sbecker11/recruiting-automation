@@ -51,6 +51,19 @@ PLIST_PATH="${RECRUITING_AUTOMATION_PLIST_PATH:-$HOME/Library/LaunchAgents/$PLIS
 COMMS_REPO="${RECRUITING_AUTOMATION_COMMS_REPO:-$WORKSPACE_ROOT/comms-migration}"
 JOBTRACKER_REPO="${RECRUITING_AUTOMATION_JOBTRACKER_REPO:-$WORKSPACE_ROOT/job-tracker}"
 
+# Serializes every job-tracker step below that writes to leads.db against
+# the independent 3-minute comms_fast_cycle.py LaunchAgent tick (and the
+# "Check inbox now" button), which already acquire this same lock file
+# internally before writing. zsh has no built-in flock and macOS ships no
+# flock(1), so each such step below runs through a tiny Python wrapper
+# (job-tracker/scripts/with_db_lock.py) that does the real fcntl.flock() on
+# that same lock file before exec'ing the real script — see that script's
+# docstring for why the lock has to be acquired here (run_cycle.sh) rather
+# than inside the individual triage/render scripts themselves. Added
+# 2026-08-18 after exactly this gap let a hurried commit lose the SQLite
+# busy-timeout race and HALT the schedule ("database is locked").
+DB_LOCK_PREFIX="exec python3 scripts/with_db_lock.py --lock var/comms_fast.lock --wait-seconds 180 -- python3"
+
 mkdir -p "$LOGS_DIR" "$STATE_DIR"
 
 LOG="$LOGS_DIR/run-$(date +%Y%m%d-%H%M%S).log"
@@ -131,7 +144,7 @@ run_step "comms-migration: classify recruiting_funnel (live, LLM fallback defaul
 # The wall budget stops cleanly mid-batch (exit 0) before that kill fires;
 # processed_messages persists, so remaining mail continues next hour.
 run_step "job-tracker: triage_recruiter_inbox (live, LLM eval + llm-fallback extraction + auto-generate on pursue)" \
-  zsh -c "cd '$JOBTRACKER_REPO' && source .venv/bin/activate && exec python3 scripts/triage_recruiter_inbox.py --llm-fallback --inbox-batch-message-cap 30 --inbox-batch-wall-budget-secs 1200"
+  zsh -c "cd '$JOBTRACKER_REPO' && source .venv/bin/activate && $DB_LOCK_PREFIX scripts/triage_recruiter_inbox.py --llm-fallback --inbox-batch-message-cap 30 --inbox-batch-wall-budget-secs 1200"
 
 # Archives the recruiter/LinkedIn traffic the step above never sees (mail
 # comms-migration deliberately routes to Category/social instead of
@@ -155,7 +168,7 @@ if [[ -f "$STATE_DIR/linkedin_catchup_requested" ]]; then
   log "LinkedIn catch-up requested — scan_communications --newer-than $LINKEDIN_NEWER_THAN"
 fi
 run_step "job-tracker: scan_communications (LinkedIn replies + Sent-folder thread matches)" \
-  zsh -c "cd '$JOBTRACKER_REPO' && source .venv/bin/activate && exec python3 scripts/scan_communications.py --llm-fallback --include-sent --newer-than $LINKEDIN_NEWER_THAN"
+  zsh -c "cd '$JOBTRACKER_REPO' && source .venv/bin/activate && $DB_LOCK_PREFIX scripts/scan_communications.py --llm-fallback --include-sent --newer-than $LINKEDIN_NEWER_THAN"
 
 # shawn.becker@spexture.com (2026-07-22) — Hostinger-hosted plain IMAP, not
 # Gmail/Google Workspace, so none of the Gmail-API steps above can ever see
@@ -170,7 +183,7 @@ run_step "job-tracker: scan_communications (LinkedIn replies + Sent-folder threa
 # cycle's worst case leaves plenty of hourly cycles to work through the
 # backlog without risking step_stall_kill / HALT.
 run_step "job-tracker: triage_imap_inbox (shawn.becker@spexture.com, live, LLM eval + llm-fallback extraction)" \
-  zsh -c "cd '$JOBTRACKER_REPO' && source .venv/bin/activate && exec python3 scripts/triage_imap_inbox.py --imap-prefix SPEXTURE --llm-fallback --inbox-batch-message-cap 30 --inbox-batch-wall-budget-secs 1200"
+  zsh -c "cd '$JOBTRACKER_REPO' && source .venv/bin/activate && $DB_LOCK_PREFIX scripts/triage_imap_inbox.py --imap-prefix SPEXTURE --llm-fallback --inbox-batch-message-cap 30 --inbox-batch-wall-budget-secs 1200"
 
 # Closes the "Awaiting full-LLM-review" loop (2026-07-19) — leads whose free
 # rule-based score already cleared the LLM-review gate but never got the
@@ -184,7 +197,7 @@ run_step "job-tracker: triage_imap_inbox (shawn.becker@spexture.com, live, LLM e
 # actual "pursue"), so cost is bounded by however many leads are actually
 # eligible, not a flat rate — see cli/process_awaiting_llm_review.py.
 run_step "job-tracker: process_awaiting_llm_review (full-LLM-review sweep for leads stuck past the score gate)" \
-  zsh -c "cd '$JOBTRACKER_REPO' && source .venv/bin/activate && exec python3 scripts/process_awaiting_llm_review.py"
+  zsh -c "cd '$JOBTRACKER_REPO' && source .venv/bin/activate && $DB_LOCK_PREFIX scripts/process_awaiting_llm_review.py"
 
 # Re-syncs each already-triaged message's JobTracker/PURSUE|SKIP|
 # NEEDS_REVIEW label to its lead(s)' CURRENT verdict (2026-07-19) — without
@@ -197,7 +210,7 @@ run_step "job-tracker: resync_labels (re-sync stale JobTracker/* labels to curre
   zsh -c "cd '$JOBTRACKER_REPO' && source .venv/bin/activate && exec python3 scripts/resync_labels.py"
 
 run_step "job-tracker: render_pending_actions" \
-  zsh -c "cd '$JOBTRACKER_REPO' && source .venv/bin/activate && exec python3 scripts/render_pending_actions.py"
+  zsh -c "cd '$JOBTRACKER_REPO' && source .venv/bin/activate && $DB_LOCK_PREFIX scripts/render_pending_actions.py"
 
 run_step "job-tracker: render_contacts (static contacts-lookup page)" \
   zsh -c "cd '$JOBTRACKER_REPO' && source .venv/bin/activate && exec python3 scripts/render_contacts.py"

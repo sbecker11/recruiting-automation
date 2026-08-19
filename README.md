@@ -92,7 +92,7 @@ whether it's actually needed.
 
 | File | Purpose |
 |---|---|
-| `install.sh` | Start (or restart) the automation: clears any `state/HALT`, resets the window from "now" (`WINDOW_HOURS` from `.env` if present, else 48h — a CLI arg overrides both), writes/reloads the main LaunchAgent. **Safe to re-run anytime** — this is also the fix for "the schedule stopped and I want it running again." |
+| `install.sh` | Start (or restart) the automation: clears any `state/HALT`, resets the window from "now" (`WINDOW_HOURS` from `.env` if present, else 48h — a CLI arg overrides both), writes/reloads the main LaunchAgent. **Safe to re-run anytime** — this is also the fix for "the schedule stopped and I want it running again." `WINDOW_HOURS=0` disables the expiry window entirely — the schedule then runs indefinitely until `stop.sh`/`state/HALT` (added 2026-08-18 at Shawn's request; see `state/expiry_epoch` below). |
 | `.env` | Optional local override for `WINDOW_HOURS`. Git-ignored, no secrets — see `.env.example`. |
 | `run_cycle.sh` | One tick of the pipeline (see diagram above). Called hourly by launchd, and once immediately on install (`RunAtLoad`). Sources `lib/cycle_safety.sh` for all the safety behavior — see below. |
 | `lib/cycle_safety.sh` | The actual halt/timeout/shutdown-trap logic, factored out of `run_cycle.sh` (2026-07-13) specifically so `tests/` can exercise it in isolation. Not meant to be run directly. |
@@ -103,8 +103,8 @@ whether it's actually needed.
 | `scripts/coverage.sh` | Run this repo's bats suite and print a pass/fail summary (line coverage N/A for shell). |
 | `scripts/report-coverage-all.sh` | Workspace rollup: runs each sibling's `scripts/coverage.sh` and prints a group table. |
 | `state/HALT` | Sentinel file. Presence means the schedule is stopped and `run_cycle.sh` will no-op + unload itself on its next tick if somehow still loaded. Cleared automatically by `install.sh`/`ensure_running.sh`. |
-| `state/expiry_epoch` | Unix epoch when the current window ends. Written by `install.sh`. On expiry, `run_cycle.sh` stops itself with reason "ready for Monday triage" — this is a deliberate design (forces a periodic manual check-in), not a bug; re-run `install.sh` to start a fresh window. |
-| `state/window_hours` | The `WINDOW_HOURS` value `install.sh` actually used to compute the expiry above — lets `status.sh` show the configured length, not just time remaining. |
+| `state/expiry_epoch` | Unix epoch when the current window ends. Written by `install.sh` when `WINDOW_HOURS` is nonzero; on expiry, `run_cycle.sh` stops itself with reason "ready for Monday triage" — this was originally a deliberate design (forces a periodic manual check-in), not a bug. **As of 2026-08-18, Shawn opted out of the forced check-in** — `.env` now sets `WINDOW_HOURS=0`, so `install.sh` no longer writes this file at all and the schedule runs indefinitely (`preflight_check` in `lib/cycle_safety.sh` only checks expiry when the file exists). Set `WINDOW_HOURS` back to a positive value in `.env` (or pass a CLI arg to `install.sh`) to restore a forced-check-in window. |
+| `state/window_hours` | The `WINDOW_HOURS` value `install.sh` actually used — lets `status.sh` show the configured length (or "none" when running indefinitely), not just time remaining. |
 | `logs/run-*.log` | One timestamped log per cycle tick, full output of all 7 steps. |
 | `logs/login-check.log` | `ensure_running.sh`'s own log (one line per login: no-op, or "restarting" with a reason). |
 | `logs/install.log` | Durable one-line-per-run history of every `install.sh` invocation (added 2026-07-15): timestamp, `WINDOW_HOURS` used, its source (CLI arg / `.env` / hardcoded default), resulting expiry, and *why* — `ensure_running.sh` passes its own restart reason through via `RECRUITING_AUTOMATION_INSTALL_REASON` so a login-triggered restart shows up distinctly from a manual one. Unlike `install.sh`'s own `echo` output (only captured when invoked through `ensure_running.sh`, lost otherwise), this always persists regardless of how `install.sh` was invoked. |
@@ -117,7 +117,9 @@ Two separate agents, both under `~/Library/LaunchAgents/`:
 1. **`com.sbecker11.recruiting-automation`** — the main schedule.
    `StartInterval=3600` (hourly) + `RunAtLoad=true`. Installed/reloaded by
    `install.sh`. Unloads itself (see `run_cycle.sh`'s `unload_self`) on halt
-   or 48h expiry — a stopped schedule is *not* loaded, not just idle.
+   or window expiry (if a window is configured; `WINDOW_HOURS=0` disables
+   this entirely — see `state/expiry_epoch` above) — a stopped schedule is
+   *not* loaded, not just idle.
 2. **`com.sbecker11.recruiting-automation-login-check`** (added
    2026-07-13) — `RunAtLoad=true` **only**, no interval. Fires
    `ensure_running.sh` once per actual login/reboot. This is a safety net
@@ -287,9 +289,10 @@ still get it).
 ./status.sh              # full health check: loaded/halted/expiry, install
                           # history, recent cycle outcomes, sibling API-key
                           # status, latest log tail
-./install.sh              # (re)start a fresh window, clearing any halt
+./install.sh              # (re)start, clearing any halt
                           # (WINDOW_HOURS from .env if present, else 48h)
 ./install.sh 72           # same, but a 72-hour window — CLI arg always wins over .env
+./install.sh 0            # same, but no expiry window at all — runs indefinitely
 ./stop.sh                 # stop early on purpose
 tail -f logs/run-*.log    # follow the current/latest cycle live
 tail logs/install.log     # history of every (re)install: when, what window, why
