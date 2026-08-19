@@ -1,8 +1,10 @@
 .DS_Store
 
-# Local schedule config (WINDOW_HOURS override) — no secrets, but personal
-# preference shouldn't show up as a tracked-file diff. See .env.example.
-.env
+# .env is intentionally tracked as of 2026-08-19 (git-crypt-encrypted at
+# rest, see .gitattributes) — its actual content here is tiny/non-secret
+# (just WINDOW_HOURS=0), but it's tracked via git-crypt anyway for
+# consistency with job-tracker/comms-migration, which do hold real secrets.
+# See .env.example for the documented default.
 
 # Real personal data: email subjects/senders, LLM cost/category breakdowns,
 # job-lead details from every cycle. Never committed, especially since this
