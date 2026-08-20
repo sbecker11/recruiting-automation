@@ -89,7 +89,13 @@ touch "$LOG"
 # batches should stop earlier via inbox_batch_wall_budget_secs (exit 0) so
 # they never reach this kill / HALT path.
 STEP_STALL_KILL_SECS="${RECRUITING_AUTOMATION_STEP_STALL_KILL_SECS:-${RECRUITING_AUTOMATION_STEP_TIMEOUT_SECS:-1800}}"
-TIMEOUT_BIN="/usr/local/bin/timeout"
+# Resolved dynamically (2026-08-19, was a hardcoded "/usr/local/bin/timeout")
+# — macOS ships no `timeout` at all; this only exists via Homebrew coreutils,
+# whose default prefix (and whether it's named `timeout` vs `gtimeout`)
+# depends on chip architecture and how coreutils was installed. Hardcoding
+# the Intel/`--with-default-names` path broke silently anywhere else,
+# including CI's macos-latest runner (Apple Silicon, `gtimeout` only).
+TIMEOUT_BIN="$(command -v timeout || command -v gtimeout || echo /usr/local/bin/timeout)"
 
 SCRIPT_DIR="${0:A:h}"
 source "$SCRIPT_DIR/lib/cycle_safety.sh"

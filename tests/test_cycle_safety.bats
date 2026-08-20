@@ -23,7 +23,11 @@ setup() {
   PLIST_LABEL="com.sbecker11.recruiting-automation-TEST-$$"
   PLIST_PATH="$TEST_DIR/fake.plist"
   STEP_STALL_KILL_SECS=5
-  TIMEOUT_BIN="/usr/local/bin/timeout"
+  # Resolved the same way run_cycle.sh does (2026-08-19) rather than
+  # hardcoding "/usr/local/bin/timeout" — that path doesn't exist on CI's
+  # macos-latest (Apple Silicon; Homebrew coreutils only provides
+  # `gtimeout` there, not `timeout`).
+  TIMEOUT_BIN="$(command -v timeout || command -v gtimeout || echo /usr/local/bin/timeout)"
   REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
   touch "$LOG"
 }

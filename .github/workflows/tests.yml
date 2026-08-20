@@ -16,8 +16,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install bats-core
-        run: brew install bats-core
+      - name: Install bats-core and coreutils
+        # coreutils provides `gtimeout` (GNU timeout) — macOS ships no
+        # `timeout` at all; lib/cycle_safety.sh's TIMEOUT_BIN resolution
+        # (run_cycle.sh / tests/test_cycle_safety.bats) checks for either
+        # name via `command -v`.
+        run: brew install bats-core coreutils
 
       - name: Run bats test suite
         run: bats tests/
