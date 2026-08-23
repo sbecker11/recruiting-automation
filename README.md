@@ -1,373 +1,84 @@
 # recruiting-automation
 
-Orchestration layer that ties the two sibling repos together into one
-unattended, scheduled pipeline:
+**Orchestration only** — schedules and wraps sibling CLIs. Owns none of the
+routing or JD/package business logic.
 
 ```
-comms-migration: classify personal_hub      (label + archive recruiter_job etc.)
-        ↓
-comms-migration: classify recruiting_funnel (same, full category taxonomy,
-                                               plus a Spam-folder sweep —
-                                               rules + high-confidence-only
-                                               LLM, rescuing only confirmed
-                                               recruiter_job mail out of Spam)
-        ↓
-job-tracker: triage_recruiter_inbox.py       (LLM eval + résumé/cover-letter
-                                               generation on a "pursue" verdict;
-                                               relabels + archives Category/
-                                               recruiter_job mail JobTracker/
-                                               PURSUE|SKIP|NEEDS_REVIEW)
-        ↓
-job-tracker: scan_communications.py          (archives LinkedIn Category/social
-                                               replies triage never sees; labels
-                                               them JobTracker/Linked or
-                                               JobTracker/NeedsFollowup)
-        ↓
-job-tracker: process_awaiting_llm_review.py  (sweeps leads whose free score
-                                               cleared the LLM-review gate but
-                                               never got a real LLM call —
-                                               most often scan_communications'
-                                               own stub leads; runs the same
-                                               two-tier review apply_package.py
-                                               runs by hand)
-        ↓
-job-tracker: resync_labels.py                (re-syncs any JobTracker/PURSUE|
-                                               SKIP|NEEDS_REVIEW label that's
-                                               gone stale since initial triage)
-        ↓
-job-tracker: render_pending_actions.py       (refreshes the static
-                                               pending-actions.html dashboard)
+comms-migration (classify)
+  → job-tracker (triage + packages + pending-actions)
+  → this repo (hourly launchd + HALT / status)
 ```
 
-As of 2026-07-19, every category of recruiting mail this pipeline touches
-ends up with a Gmail label that reflects its CURRENT state (not just a
-snapshot from whenever it was first triaged) — see the job-tracker README's
-"Keeping Gmail labels trustworthy" section for why that matters and what it
-enables (a client-side Gmail filter, or simply trusting the label without
-opening the message).
+Umbrella install / ops: [`../README.md`](../README.md) (or [`docs/WORKSPACE.md`](docs/WORKSPACE.md))  
+Secrets / git-crypt: [`../SECRETS.md`](../SECRETS.md) (or [`docs/SECRETS.md`](docs/SECRETS.md))  
+Full historical detail: [`docs/REFERENCE.md`](docs/REFERENCE.md)
 
-Each step is a real repo's own CLI script (`run_cycle.sh` just calls them in
-order with a per-step timeout) — this directory owns none of the actual
-business logic, only the scheduling/safety wrapper around it. See:
-- [`comms-migration` README](../comms-migration/README.md)
-- [`job-tracker` README](../job-tracker/README.md)
-
-## Project layout
-
-All three projects are siblings under one parent, `~/workspace-recruiting-automation/`:
-
-```
-~/workspace-recruiting-automation/
-  comms-migration/     (own git repo + remote, own .venv)
-  job-tracker/          (own git repo + remote, own .venv)
-  recruiting-automation/  (this directory — not yet its own git repo)
-```
-
-**History:** originally `comms-migration` and `job-tracker` each lived under
-their own separate `~/workspace-comms/` / `~/workspace-job-tracker/` parent,
-and this directory lived at `~/bin/recruiting-automation` (untracked —
-`~/bin` is its own git repo, but its `.gitignore` blanket-ignores all
-subfolders, so nothing here was ever backed up). Consolidated into one
-shared parent on 2026-07-13, both to give this layer proper git backup
-potential and because it's outgrown "one-off script in `~/bin`" — it's a
-real project with its own state machine and pending feature work now.
-
-**Gotcha hit during that move, worth remembering for next time anything
-here needs relocating again:** Python venvs (`.venv/`) are **not
-relocatable** — `venv`'s `activate` script and `pyvenv.cfg` bake in the
-venv's absolute path *literally* at creation time (not computed
-dynamically from the script's own location), so moving the parent repo
-silently leaves `.venv/bin/activate` pointing at the old, now-nonexistent
-path. The symptom is confusing: `source .venv/bin/activate` "succeeds" with
-no error, but `python3` inside it silently resolves back to the system
-interpreter instead of the venv's — so imports of anything only installed
-in the venv (e.g. `jsonschema`, `anthropic`) fail with
-`ModuleNotFoundError`, and it looks like a dependency problem rather than a
-path problem. Fix: `rm -rf .venv && python3 -m venv .venv && source
-.venv/bin/activate && pip install -r requirements.txt` — cheap to just
-always do this after moving/renaming a repo rather than trying to diagnose
-whether it's actually needed.
-
-## Files
-
-| File | Purpose |
-|---|---|
-| `install.sh` | Start (or restart) the automation: clears any `state/HALT`, resets the window from "now" (`WINDOW_HOURS` from `.env` if present, else 48h — a CLI arg overrides both), writes/reloads the main LaunchAgent. **Safe to re-run anytime** — this is also the fix for "the schedule stopped and I want it running again." `WINDOW_HOURS=0` disables the expiry window entirely — the schedule then runs indefinitely until `stop.sh`/`state/HALT` (added 2026-08-18 at Shawn's request; see `state/expiry_epoch` below). |
-| `.env` | Optional local override for `WINDOW_HOURS`. **git-crypt encrypted, not git-ignored** (2026-08-19) — see `.env.example` and "Decrypting `.env` on a new machine" below. Holds no secret today (just `WINDOW_HOURS`), but is encrypted for consistency with the sibling repos and in case that changes. |
-| `run_cycle.sh` | One tick of the pipeline (see diagram above). Called hourly by launchd, and once immediately on install (`RunAtLoad`). Sources `lib/cycle_safety.sh` for all the safety behavior — see below. |
-| `lib/cycle_safety.sh` | The actual halt/timeout/shutdown-trap logic, factored out of `run_cycle.sh` (2026-07-13) specifically so `tests/` can exercise it in isolation. Not meant to be run directly. |
-| `ensure_running.sh` | Runs once per login (see the login-check LaunchAgent below). If the main automation isn't loaded, or is loaded but halted, re-runs `install.sh`. No-ops otherwise. |
-| `status.sh` | Quick health check: launchd state, halt sentinel, configured window + time remaining, last 5 install-log entries, last 5 cycles' pass/fail outcomes, whether both sibling repos actually resolve `ANTHROPIC_API_KEY`, and a tail of the latest log. This is the one command to run for "what's the current and historic status of the process." |
-| `stop.sh` | Manually stop early (writes `HALT`, unloads the LaunchAgent). |
-| `tests/` | `bats-core` test suite for all of the above — see `tests/README.md`. |
-| `scripts/coverage.sh` | Run this repo's bats suite and print a pass/fail summary (line coverage N/A for shell). |
-| `scripts/report-coverage-all.sh` | Workspace rollup: runs each sibling's `scripts/coverage.sh` and prints a group table. |
-| `state/HALT` | Sentinel file. Presence means the schedule is stopped and `run_cycle.sh` will no-op + unload itself on its next tick if somehow still loaded. Cleared automatically by `install.sh`/`ensure_running.sh`. |
-| `state/expiry_epoch` | Unix epoch when the current window ends. Written by `install.sh` when `WINDOW_HOURS` is nonzero; on expiry, `run_cycle.sh` stops itself with reason "ready for Monday triage" — this was originally a deliberate design (forces a periodic manual check-in), not a bug. **As of 2026-08-18, Shawn opted out of the forced check-in** — `.env` now sets `WINDOW_HOURS=0`, so `install.sh` no longer writes this file at all and the schedule runs indefinitely (`preflight_check` in `lib/cycle_safety.sh` only checks expiry when the file exists). Set `WINDOW_HOURS` back to a positive value in `.env` (or pass a CLI arg to `install.sh`) to restore a forced-check-in window. |
-| `state/window_hours` | The `WINDOW_HOURS` value `install.sh` actually used — lets `status.sh` show the configured length (or "none" when running indefinitely), not just time remaining. |
-| `logs/run-*.log` | One timestamped log per cycle tick, full output of all 7 steps. |
-| `logs/login-check.log` | `ensure_running.sh`'s own log (one line per login: no-op, or "restarting" with a reason). |
-| `logs/install.log` | Durable one-line-per-run history of every `install.sh` invocation (added 2026-07-15): timestamp, `WINDOW_HOURS` used, its source (CLI arg / `.env` / hardcoded default), resulting expiry, and *why* — `ensure_running.sh` passes its own restart reason through via `RECRUITING_AUTOMATION_INSTALL_REASON` so a login-triggered restart shows up distinctly from a manual one. Unlike `install.sh`'s own `echo` output (only captured when invoked through `ensure_running.sh`, lost otherwise), this always persists regardless of how `install.sh` was invoked. |
-| `logs/launchd.{out,err}.log` | Raw launchd stdout/stderr for the main agent (usually empty/redundant with `run-*.log`, since `run_cycle.sh` does its own logging+`tee`). |
-
-**`.env` is git-crypt encrypted, not git-ignored** (2026-08-19): unlike most
-repos, this `.env` is intentionally *tracked* so `WINDOW_HOURS` travels with
-the repo, but `.gitattributes` (`.env filter=git-crypt diff=git-crypt`)
-makes git transparently AES-256-encrypt it on commit and decrypt it on
-checkout — GitHub only ever stores ciphertext. On this machine that's
-already invisible (the key was registered here when git-crypt was set up),
-but a fresh clone anywhere else needs one manual step — see below.
-
-### Decrypting `.env` on a new machine
-
-On a brand-new clone of this repo (a different Mac, a CI runner, anywhere
-the key hasn't been registered yet), `.env` in the working tree is opaque
-ciphertext until unlocked:
-
-1. **Install `git-crypt`** on that machine (not needed on this one, where
-   it's already installed and registered):
-   ```bash
-   brew install git-crypt
-   ```
-2. **Get the key file there securely.** The symmetric key lives outside git
-   entirely, at `~/.git-crypt-keys/recruiting-automation.key` on this Mac
-   (`chmod 600`). Copy that exact file to the new machine through an
-   out-of-band channel you trust — an encrypted USB drive, your password
-   manager's secure file/attachment storage, or `scp` directly between two
-   machines you control over SSH. **Never** email it, commit it to any git
-   repo (this one or otherwise), or paste its contents into chat/Slack/any
-   other unencrypted channel.
-3. **Clone the repo as usual, then unlock from the repo root** with the
-   copied key file:
-   ```bash
-   git-crypt unlock /path/to/copied/recruiting-automation.key
-   ```
-   This decrypts the currently-checked-out `.env` in place and registers
-   the key with that machine's local `.git` directory, so every future
-   checkout and commit on that machine is transparent from then on.
-4. **Verify it worked:**
-   ```bash
-   git-crypt status    # "encrypted: .env" reflects .gitattributes config,
-                        # not lock state, so it prints that either way —
-                        # it's a sanity check the filter is wired up, not
-                        # proof of a successful unlock
-   cat .env             # the real proof: a readable WINDOW_HOURS=... line,
-                        # not binary garbage
-   ```
-   `git-crypt unlock` itself also fails loudly (non-zero exit, an error
-   message) if the key file is wrong or the working tree isn't clean, so a
-   silent successful return plus a readable `.env` together confirm success.
-5. **If you clone and never run `git-crypt unlock`:** this is the safe
-   default, not a bug. `.env` stays as encrypted bytes in the working tree;
-   `install.sh` falls back to its hardcoded default (48h window) instead of
-   reading `WINDOW_HOURS` — never a silent leak, never a crash.
-6. **If the key file is ever lost with no other copy, it's unrecoverable —
-   there is no backdoor.** Keep a durable backup of it (and its
-   `job-tracker.key` / `comms-migration.key` siblings) somewhere outside
-   git entirely — a password manager's secure notes/file storage, or macOS
-   Keychain, both work well.
-
-## LaunchAgents (macOS scheduling)
-
-Two separate agents, both under `~/Library/LaunchAgents/`:
-
-1. **`com.sbecker11.recruiting-automation`** — the main schedule.
-   `StartInterval=3600` (hourly) + `RunAtLoad=true`. Installed/reloaded by
-   `install.sh`. Unloads itself (see `run_cycle.sh`'s `unload_self`) on halt
-   or window expiry (if a window is configured; `WINDOW_HOURS=0` disables
-   this entirely — see `state/expiry_epoch` above) — a stopped schedule is
-   *not* loaded, not just idle.
-2. **`com.sbecker11.recruiting-automation-login-check`** (added
-   2026-07-13) — `RunAtLoad=true` **only**, no interval. Fires
-   `ensure_running.sh` once per actual login/reboot. This is a safety net
-   for the case where agent #1 halted (or the Mac rebooted/crashed) and
-   nobody noticed — **it does NOT fire on sleep/wake**, only on a real
-   login event, since the Mac never actually logs out during sleep. See
-   "Sleep vs. shutdown vs. login" below for why this still matters.
-
-Check both are loaded: `launchctl print "gui/$(id -u)/com.sbecker11.recruiting-automation"` (swap in `-login-check` for the other one).
-
-## Safety behavior in `run_cycle.sh`
-
-- **Per-step timeout (1800s / 30min, raised from 900s/15min on 2026-07-18)**,
-  via `/usr/local/bin/timeout`. Guards against a step *hanging* (e.g. a stuck
-  interactive OAuth prompt nobody's there to complete) rather than failing
-  outright — without this, a hang wouldn't trip the halt-on-error logic below
-  at all, it'd just silently freeze the schedule for the rest of the window.
-  Raised because a real production run legitimately needed more than 900s
-  (several dense multi-JD digest emails in one hour, each needing its own
-  chain of extract/evaluate/generate LLM calls) and got killed as a false
-  positive — every other cycle that week finished in 1-60s, and 1800s still
-  leaves comfortable margin under the hourly `StartInterval` (3600s), so
-  there's no risk of two cycles overlapping. The halt message on a timeout
-  deliberately no longer assumes OAuth is the cause — check the cycle's log
-  for `[llm ...]` call lines still in progress near the timeout mark before
-  spending time on a re-auth that may not be needed.
-- **Halt-on-first-failure, no retry.** The first non-zero exit (or timeout)
-  in a cycle writes `state/HALT`, sends a desktop notification, unloads the
-  LaunchAgent, and stops — remaining steps in that tick are skipped, and the
-  hourly schedule won't fire again until someone (or `ensure_running.sh`, at
-  next login) clears it. **This is deliberate, not a gap** — explicitly
-  decided 2026-07-13: "if the host is unreachable, it's fine for the
-  pipeline to shut down" rather than adding retry/backoff resilience for
-  transient network blips. If that decision ever changes, the place to add
-  it is `run_step()`'s failure branch.
-- **`SIGTERM` trap** (added 2026-07-13) — the shell equivalent of a Java
-  shutdown hook / C `atexit()`. When macOS sends `SIGTERM` on a normal
-  shutdown/logout, the trap logs "Received SIGTERM ... exiting cleanly, no
-  HALT written" instead of the log just truncating silently mid-cycle
-  (which otherwise looks identical to a real hang when read later). Doesn't
-  fire on `SIGKILL` — same limitation Java's shutdown hooks have; not a
-  concern here since the trap exits immediately once it does fire.
-
-## Sleep vs. shutdown vs. login — why this distinction keeps mattering
-
-Three different states, three different implications for this pipeline:
-
-- **Sleep** (lid closed, or idle sleep): the Mac stays logged in, launchd
-  agents stay loaded, but the network stack may not fully reassociate
-  during macOS's brief periodic "dark wake" / Power Nap windows — this is
-  the confirmed root cause of a real overnight outage (2026-07-13,
-  `OSError: [Errno 65] No route to host` at 2:09 AM, sat halted until ~7:12
-  AM before someone noticed). **Fix: don't close the lid overnight**, or
-  use true clamshell mode (lid closed + external keyboard AND mouse/
-  trackpad AND display all connected) so the Mac does full wakes instead.
-  A login script can't help here since no login/logout ever happens.
-- **Shutdown/logout**: `SIGTERM` reaches every process; the trap above just
-  makes the log legible about why the cycle stopped. `ensure_running.sh`
-  picks the schedule back up automatically on the next login.
-- **Login/reboot**: `com.sbecker11.recruiting-automation-login-check` fires
-  `ensure_running.sh`, which restarts the main schedule if it isn't already
-  loaded and healthy.
-
-## Testing
+## Quick start
 
 ```bash
-brew install bats-core
-bats tests/
-
-# Same suite via the convenience wrapper (prints pass/fail; coverage N/A
-# for shell — bats has no line-coverage tooling assumed here):
-./scripts/coverage.sh
+# From this directory (siblings must sit next to it under the same parent)
+brew install bats-core          # for tests
+./install.sh                    # start/restart schedule (clears HALT)
+# ./install.sh 0                # no expiry window — run until stop.sh
+./status.sh                     # health check
 ```
 
-### Workspace coverage rollup
-
-From the parent workspace directory (or via this repo's orchestrator):
+Optional local override: `.env` with `WINDOW_HOURS=…` (git-crypt encrypted —
+unlock per [`../SECRETS.md`](../SECRETS.md)).
 
 ```bash
-# Thin wrapper at the workspace root (not versioned — this parent isn't a git repo):
-../report-coverage.sh
-
-# Versioned equivalent (safe to run from anywhere):
-./scripts/report-coverage-all.sh
+./stop.sh                       # intentional stop
 ```
 
-That runs `job-tracker/scripts/coverage.sh`, `comms-migration/scripts/coverage.sh`,
-and this repo's `scripts/coverage.sh`, then prints a per-project + group table.
-Exits non-zero if any suite fails. Python projects report pytest-cov line/branch
-%; this repo reports bats pass/fail with coverage marked N/A.
+## Common commands
 
-Every script (`run_cycle.sh`, `install.sh`, `status.sh`, `stop.sh`,
-`ensure_running.sh`) reads its `BASE`/`PLIST_LABEL`/`PLIST_PATH`/repo paths
-from `RECRUITING_AUTOMATION_*` environment variables, each defaulting to the
-real production value when unset — so normal use is completely unaffected,
-but `tests/` can point every one of them at a throwaway sandbox instead and
-never touch the real `HALT` sentinel, the real 48-hour window, the real
-LaunchAgent, or make a live Gmail/Anthropic call. See `tests/README.md` for
-exactly what's covered and how the isolation works.
+| Goal | Command |
+|------|---------|
+| Is it healthy? | `./status.sh` |
+| Restart after HALT | `./install.sh` |
+| Stop | `./stop.sh` |
+| Follow latest cycle | `tail -f logs/run-*.log` |
+| Install history | `tail logs/install.log` |
+| Tests | `brew install bats-core && bats tests/` or `./scripts/coverage.sh` |
+| Workspace coverage | `../report-coverage.sh` |
 
-### `RECRUITING_AUTOMATION_WORKSPACE_ROOT` — single source of truth for the parent dir
+## Safety model (do not “fix away”)
 
-All five scripts above, plus `job_tracker/__init__.py` and
-`classifier/__init__.py` in the sibling repos, independently needed to know
-where `~/workspace-recruiting-automation/` (the shared parent holding all
-three sibling repos) lives — before 2026-07-15 that was five separate
-hardcoded `$HOME/workspace-recruiting-automation/...` defaults in the shell
-scripts plus two independently-counted `Path(__file__).resolve().parents[N]`
-computations in the Python packages. Renaming or relocating the workspace
-meant hunting down and updating all seven.
+| Signal | Meaning |
+|--------|---------|
+| `state/HALT` | Schedule stopped; `run_cycle.sh` no-ops / unloads |
+| `state/expiry_epoch` | Window end (only when `WINDOW_HOURS` ≠ 0) |
+| Halt-on-first-failure | Deliberate — no auto-retry for network blips |
+| Per-step timeout | 1800s — guards hangs, not “slow but fine” runs |
 
-Now there's one override point: set `RECRUITING_AUTOMATION_WORKSPACE_ROOT`
-(as a real exported env var, e.g. in `~/.zshrc`, or per-invocation) to
-change the parent directory everywhere at once. Precedence, same pattern as
-every other `RECRUITING_AUTOMATION_*` var here:
+`install.sh` is safe to re-run anytime. Login LaunchAgent
+(`…-login-check`) restarts a halted schedule after reboot/login — **not**
+after sleep/wake. Prefer leaving the Mac awake overnight (or true clamshell
+with display + keyboard + mouse).
 
-1. The more specific var, if set directly (`RECRUITING_AUTOMATION_BASE`,
-   `RECRUITING_AUTOMATION_COMMS_REPO`, `RECRUITING_AUTOMATION_JOBTRACKER_REPO`)
-   — this is what every existing test does, so test isolation is unaffected.
-2. `RECRUITING_AUTOMATION_WORKSPACE_ROOT`, if set — every script derives its
-   own default (`$WORKSPACE_ROOT/recruiting-automation`, `.../comms-migration`,
-   `.../job-tracker`) from it.
-3. The hardcoded fallback, `$HOME/workspace-recruiting-automation`.
+## Workspace root
 
-`run_cycle.sh` and `status.sh` (the two scripts that spawn Python
-subprocesses into the sibling repos) `export` the resolved value as
-`RECRUITING_AUTOMATION_WORKSPACE_ROOT` before invoking them, so an override
-set on the shell script's own invocation reaches `job_tracker/__init__.py` /
-`classifier/__init__.py` too — both check the same env var before falling
-back to their own file-relative derivation (`_PROJECT_ROOT_ENV.parent.parent`,
-which itself no longer needs a second independently-counted `parents[N]`).
-
-## OAuth token expiry (resolved 2026-07-13)
-
-The Google OAuth app both sibling repos authenticate against
-(`job-tracker-desktop`) was in Testing publishing status, which hard-expired
-refresh tokens every 7 days regardless of use — the other historical cause
-of unattended-schedule interruptions (distinct from the sleep/network issue
-above). Moved to "In production" 2026-07-13; all 5 token grants across both
-repos were force-refreshed under the new policy the same day. Full details
-and the account/scope table live in `comms-migration`'s README
-("Re-authenticating when a login expires"). Should not recur; if it does,
-that section explains what to check first.
-
-## Shared config across sibling repos
-
-`~/workspace-recruiting-automation/.env` (not tracked by any git repo — that
-parent directory isn't one) holds the single copy of `ANTHROPIC_API_KEY`
-used by both `job-tracker` and `comms-migration`, instead of duplicating the
-same key in each repo's own `.env`. Each repo's own `.env` still wins if it
-sets the key locally (see `job_tracker/__init__.py` /
-`classifier/__init__.py`'s load order) — only fall back there if you
-genuinely want one repo using a different key than the other. Both repos
-print a one-line diagnostic at import time (`[job_tracker] ANTHROPIC_API_KEY:
-loaded from shared .env (...) (108 chars).` or a `WARNING: ... is not set`
-if neither file nor the shell environment has it) — this shows up in every
-`run-*.log` automatically, and `status.sh` also checks it directly.
-`comms-migration`'s version always prints; `job_tracker`'s is opt-in via
-`JOB_TRACKER_LOG_ENV_SOURCE=1` (added 2026-07-24, quiet by default so it
-doesn't spam every interactive CLI command like `list_leads`/`apply_package`
-— `run_cycle.sh` and `status.sh` both set the var so their own logs/output
-still get it).
-
-## Common tasks
+Scripts default to `$HOME/workspace-recruiting-automation`. Override:
 
 ```bash
-./status.sh              # full health check: loaded/halted/expiry, install
-                          # history, recent cycle outcomes, sibling API-key
-                          # status, latest log tail
-./install.sh              # (re)start, clearing any halt
-                          # (WINDOW_HOURS from .env if present, else 48h)
-./install.sh 72           # same, but a 72-hour window — CLI arg always wins over .env
-./install.sh 0            # same, but no expiry window at all — runs indefinitely
-./stop.sh                 # stop early on purpose
-tail -f logs/run-*.log    # follow the current/latest cycle live
-tail logs/install.log     # history of every (re)install: when, what window, why
+export RECRUITING_AUTOMATION_WORKSPACE_ROOT=/Volumes/sbecker11/workspace-recruiting-automation
 ```
 
-## Known pending work (not yet built)
+Sibling `.venv/` dirs are **not relocatable** — recreate after moving repos.
 
-- **Rejection-email detection.** Plan (as of 2026-07-13, not yet
-  implemented): scan Mac Mail's per-account Archive mailboxes via
-  AppleScript (the "All Archives" Smart Mailbox itself isn't scriptable —
-  confirmed; must iterate `sbecker11@icloud.com`, `scbboston@gmail.com`,
-  `shawn.becker@spexture.com` (Hostinger IMAP — not Gmail-API-backed, unlike
-  everything else this pipeline touches), `admin@spexture.com`,
-  `shawn.becker@yahoo.com`, and the Exchange account individually), reuse/
-  extend the rejection regex patterns already in job-tracker's
-  `job_tracker/email/classifier.py`, fuzzy-match hits against
-  `job_leads.company`, and — per explicit preference — show a confirm-before-
-  write review list rather than auto-updating `leads.db`, then fold the
-  whole thing into this hourly schedule as a 5th step once it's trustworthy.
-- **`rejected_at` column vs. reusing `status='skipped'`** for rejection
-  hits — undecided; revisit when building the scanner above.
+## Layout (this repo)
+
+| Path | Purpose |
+|------|---------|
+| `install.sh` / `stop.sh` / `status.sh` | Lifecycle |
+| `run_cycle.sh` | One hourly tick (7 steps across siblings) |
+| `ensure_running.sh` | Login safety net |
+| `lib/cycle_safety.sh` | Halt / timeout / SIGTERM trap |
+| `state/` | HALT, expiry, window metadata |
+| `logs/` | Per-cycle and install logs |
+| `tests/` | bats-core suite |
+
+## Candidate profile
+
+Do **not** invent experience, rates, or house rules here. Package generation
+runs inside **job-tracker**, which loads `~/CLAUDE.md`.
