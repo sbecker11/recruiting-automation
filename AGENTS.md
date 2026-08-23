@@ -1,5 +1,7 @@
 # recruiting-automation — Cursor project instructions
 
+**Humans:** [`README.md`](README.md) · umbrella [`docs/WORKSPACE.md`](docs/WORKSPACE.md) · secrets [`docs/SECRETS.md`](docs/SECRETS.md).
+
 **Orchestration only.** This layer schedules and wraps sibling CLIs; it owns
 none of the routing or JD/package business logic.
 
