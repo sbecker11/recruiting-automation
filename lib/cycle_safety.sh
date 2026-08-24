@@ -113,11 +113,25 @@ preflight_check() {
 
 run_step() {
   local desc="$1"; shift
-  log "--- $desc ---"
-  if "$TIMEOUT_BIN" "$STEP_STALL_KILL_SECS" "$@" >>"$LOG" 2>&1; then
-    log "OK: $desc"
-  else
+  local attempt=0
+  local max_attempts=2
+  while (( attempt < max_attempts )); do
+    attempt=$(( attempt + 1 ))
+    if (( attempt > 1 )); then
+      log "--- $desc (retry attempt $attempt) ---"
+    else
+      log "--- $desc ---"
+    fi
+    if "$TIMEOUT_BIN" "$STEP_STALL_KILL_SECS" "$@" >>"$LOG" 2>&1; then
+      log "OK: $desc"
+      return 0
+    fi
     local rc=$?
+    if (( rc == 75 && attempt < max_attempts )); then
+      log "DB lock busy (exit 75) — retrying $desc once after 60s"
+      sleep 60
+      continue
+    fi
     if (( rc == 124 )); then
       # 2026-07-18: don't over-commit to "OAuth" as the diagnosis — a real
       # timeout that day turned out to be an unusually heavy batch of
@@ -129,13 +143,13 @@ run_step() {
       # 2026-07-30: triage steps also take inbox_batch_wall_budget_secs so a
       # healthy heavy batch should exit 0 before this hard kill fires.
       log "TIMED OUT: $desc (>${STEP_STALL_KILL_SECS}s — could be a stuck interactive OAuth login, or just an unusually heavy LLM batch; check the log before assuming re-auth)"
-      echo "$desc timed out after ${STEP_STALL_KILL_SECS}s at $(date +"%Y-%m-%d %H:%M:%S %z") — could be a stuck Google login OR just a heavy batch of LLM calls; check $LOG's last few [llm ...] lines before assuming re-auth is needed." > "$HALT_FILE"
-      notify "Recruiting automation: step timed out" "$desc — could be a stuck Google sign-in or just a heavy batch. Check the log. Schedule halted."
-      stop_schedule "$desc timed out (check log: stuck OAuth login, or just a heavy LLM batch)"
+      echo "$desc timed out after ${STEP_STALL_KILL_SECS}s at $(date +"%Y-%m-%d %H:%M:%S %z") — could be a stuck Google login OR just a heavy batch of LLM calls; check $LOG's last few [llm ...] lines before assuming re-auth is needed. Restart: cd recruiting-automation && ./install.sh" > "$HALT_FILE"
+      notify "Recruiting automation: step timed out" "$desc — check $LOG. Restart: cd recruiting-automation && ./install.sh"
+      stop_schedule "$desc timed out (check log; restart with ./install.sh)"
     fi
     log "FAILED: $desc (exit $rc)"
-    echo "$desc failed (exit $rc) at $(date +"%Y-%m-%d %H:%M:%S %z") — see $LOG" > "$HALT_FILE"
-    notify "Recruiting automation: step failed" "$desc (exit $rc). Schedule halted — see $LOG"
+    echo "$desc failed (exit $rc) at $(date +"%Y-%m-%d %H:%M:%S %z") — see $LOG. Restart: cd recruiting-automation && ./install.sh" > "$HALT_FILE"
+    notify "Recruiting automation: step failed" "$desc (exit $rc). Restart: cd recruiting-automation && ./install.sh"
     stop_schedule "$desc failed (exit $rc)"
-  fi
+  done
 }

@@ -52,7 +52,7 @@ payload = {
 venv_py = jobtracker / ".venv" / "bin" / "python3"
 if venv_py.is_file():
     proc = subprocess.run(
-        [str(venv_py), "scripts/kpi_snapshot.py", "--state-dir", str(base / "state"), "--check-framework"],
+        [str(venv_py), "scripts/kpi_snapshot.py", "--state-dir", str(base / "state"), "--check-framework", "--check-label-drift", "--check-spend"],
         cwd=jobtracker,
         capture_output=True,
         text=True,
@@ -140,7 +140,7 @@ _kpi_section() {
   fi
   local kpi_raw
   kpi_raw=$(
-    cd "$JOBTRACKER_REPO" && "$JOBTRACKER_REPO/.venv/bin/python" scripts/kpi_snapshot.py --state-dir "$BASE/state" --check-framework 2>/dev/null
+    cd "$JOBTRACKER_REPO" && "$JOBTRACKER_REPO/.venv/bin/python" scripts/kpi_snapshot.py --state-dir "$BASE/state" --check-framework --check-label-drift --check-spend 2>/dev/null
   )
   python3 -c '
 import json, sys
@@ -179,6 +179,19 @@ if fs is not None:
         print("  framework sync: DRIFT — run: cd job-tracker && python scripts/verify_framework_sync.py")
         for err in fs.get("errors") or []:
             print("    - %s" % err)
+drift = d.get("labelDriftWouldRelabel")
+if drift is not None:
+    if drift == 0:
+        print("  label drift: OK (0 would relabel)")
+    else:
+        print("  label drift: %s would relabel — run: cd job-tracker && python scripts/audit_label_drift.py" % drift)
+sp = d.get("spend")
+if sp is not None:
+    print("  spend: $%.4f eval · %s pursue · %s packages" % (
+        sp.get("totalEvalCostUsd", 0),
+        sp.get("pursueLeads", "?"),
+        sp.get("packagesGenerated", "?"),
+    ))
 print("  full briefing: ./monday.sh")
 ' "$kpi_raw"
 }

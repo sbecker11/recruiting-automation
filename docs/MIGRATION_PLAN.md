@@ -201,30 +201,54 @@ Phase 4 can overlap 2/3. Phase 6 stays open throughout.
 
 ---
 
-## Day 0–1 checklist (current moment)
+**Last updated:** 2026-08-24 — Phases 0–6 **code complete**; mini2 deploy pending (`./scripts/deploy_mini2.sh`).
 
-### Day 0 — mini1 (safe while mini2 runs)
+---
 
-- [x] Define KPI table (docs — uncommitted)
-- [x] Implement `verify_framework_sync` (uncommitted)
-- [x] Extend `status.sh` with KPI + `--json` (uncommitted)
-- [x] Add `kpi_snapshot.py`, `build_kpi_counts()`, cycle KPI footer (uncommitted)
-- [x] Monday v1 committed and pushed
-- [ ] **Commit + push Phase 0/1 leftovers** (all three repos)
+## Implementation status (2026-08-24)
 
-### Day 1 — mini2 deploy window
+| Phase | Status | Key deliverables |
+|-------|--------|------------------|
+| **0** | Shipped | KPI table, `status.sh --json`, `verify_framework_sync`, `kpi_snapshot` |
+| **1** | Shipped | `./monday.sh`, UI urgency, cycle KPI footer |
+| **2** | Shipped | `MAILBOX_COVERAGE.md`, `scan_rejection_backlog.py`, PRIMER backfill § |
+| **3** | Shipped | `audit_label_drift.py`, `label_drift.py`, drift in `status.sh` |
+| **4** | Shipped | `spend_report.py`, spend in `status.sh` / `kpi_snapshot --check-spend` |
+| **5** | Shipped | `quiet_jobs_report.py`, `offer_comparison.py`, `market_withdrawal_draft.py` |
+| **6** | Shipped | DB-lock retry (exit 75), lock wait telemetry, HALT hints, `deploy_mini2.sh` |
 
-- [ ] SSH mini2; `./status.sh` — confirm not mid-cycle
-- [ ] `git pull` in comms-migration, job-tracker, recruiting-automation
-- [ ] `pip install -e ".[dev]"` in job-tracker if needed
-- [ ] `./status.sh` — KPI section + framework sync OK (`~/CLAUDE.md` on mini2)
-- [ ] `./monday.sh` — full decision briefing
-- [ ] Confirm latest cycle log shows KPI footer line
-- [ ] Open pending-actions UI; verify package-ready counts
+**Your action (one time on mini2):**
 
-### Day 2+
+```bash
+cd ~/workspace-recruiting-automation/recruiting-automation
+./scripts/deploy_mini2.sh
+```
 
-Begin Phase 2 when Phase 0/1 KPIs look healthy for ~1 week.
+---
+
+## Day 0–1 checklist
+
+### Day 0 — mini1
+
+- [x] Phase 0/1 code committed and pushed
+- [x] Phases 2–6 code committed and pushed
+
+### Day 1 — mini2 (unattended deploy script)
+
+- [ ] Run `./scripts/deploy_mini2.sh` on mini2 between cycles
+- [ ] Confirm `./status.sh` shows KPIs + framework sync OK
+- [ ] Run `./monday.sh` once
+
+### Ongoing ops (weekly)
+
+- [ ] `python scripts/spend_report.py`
+- [ ] `python scripts/audit_label_drift.py`
+- [ ] `python scripts/scan_rejection_backlog.py` (apply if needed)
+- [ ] `python scripts/quiet_jobs_report.py`
+
+---
+
+## Day 0–1 checklist (archived)
 
 ---
 
