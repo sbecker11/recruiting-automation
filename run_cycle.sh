@@ -227,4 +227,27 @@ run_step "job-tracker: render_contacts (static contacts-lookup page)" \
 date +%s > "$STATE_DIR/last_ok_cycle"
 rm -f "$STATE_DIR/stale_notified_at"
 
+# Phase 1: one-line KPI footer so cycle logs show decision-queue backlog at a glance.
+if [[ -d "$JOBTRACKER_REPO/.venv" ]]; then
+  KPI_LINE=$(
+    cd "$JOBTRACKER_REPO" && source .venv/bin/activate && python3 - <<'PY' 2>/dev/null || true
+import json, os, sys
+from pathlib import Path
+sys.path.insert(0, str(Path("src").resolve()))
+from job_tracker.cli.monday_report import build_kpi_counts
+ws = Path(os.environ.get("RECRUITING_AUTOMATION_WORKSPACE_ROOT", Path.home() / "workspace-recruiting-automation"))
+state = Path(os.environ.get("RECRUITING_AUTOMATION_BASE", ws / "recruiting-automation")) / "state"
+k = build_kpi_counts(state_dir=state)
+c = k["counts"]
+print(
+    "KPI unmatched={unmatched} awaiting_llm={awaitingLlm} packages_ready={packagesReady} "
+    "waiting={waitingOnThem} decide={needsDecision}".format(**c)
+)
+PY
+  )
+  if [[ -n "${KPI_LINE:-}" ]]; then
+    log "$KPI_LINE"
+  fi
+fi
+
 log "=== Cycle complete ==="

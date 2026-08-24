@@ -35,7 +35,7 @@ unlock per [`../SECRETS.md`](../SECRETS.md)).
 | Goal | Command |
 |------|---------|
 | **Monday briefing** | `./monday.sh` |
-| Is it healthy? | `./status.sh` |
+| Is it healthy? | `./status.sh` (add `--json` for scripts) |
 | Restart after HALT | `./install.sh` |
 | Stop | `./stop.sh` |
 | Follow latest cycle | `tail -f logs/run-*.log` |
