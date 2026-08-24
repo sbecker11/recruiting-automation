@@ -1,8 +1,11 @@
 #!/bin/zsh
-# One-command deploy for mini2 (or any production host).
+# Routine deploy for mini2 (or any production host).
 # Pulls all three sibling repos, refreshes job-tracker venv, verifies health.
 #
 #   ./scripts/deploy_mini2.sh
+#
+# For the first post-migration bootstrap only, use bootstrap_mini2_once.sh
+# (delete that script from the repo after it has run once on mini2).
 #
 set -uo pipefail
 
