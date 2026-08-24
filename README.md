@@ -34,6 +34,7 @@ unlock per [`../SECRETS.md`](../SECRETS.md)).
 
 | Goal | Command |
 |------|---------|
+| **Monday briefing** | `./monday.sh` |
 | Is it healthy? | `./status.sh` |
 | Restart after HALT | `./install.sh` |
 | Stop | `./stop.sh` |
@@ -41,6 +42,10 @@ unlock per [`../SECRETS.md`](../SECRETS.md)).
 | Install history | `tail logs/install.log` |
 | Tests | `brew install bats-core && bats tests/` or `./scripts/coverage.sh` |
 | Workspace coverage | `../report-coverage.sh` |
+
+`./monday.sh` is the zero-dead-time entry point: refresh pending-actions UI
+data, then print clarify / LLM-backlog / packages-ready / waiting / decide
+queues ranked for interview likelihood.
 
 ## Safety model (do not “fix away”)
 
