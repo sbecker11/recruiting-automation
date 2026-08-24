@@ -241,10 +241,14 @@ cd ~/workspace-recruiting-automation/recruiting-automation
 
 ### Ongoing ops (weekly)
 
-- [ ] `python scripts/spend_report.py`
-- [ ] `python scripts/audit_label_drift.py`
-- [ ] `python scripts/scan_rejection_backlog.py` (apply if needed)
-- [ ] `python scripts/quiet_jobs_report.py`
+```bash
+cd ~/workspace-recruiting-automation/recruiting-automation
+./scripts/weekly_ops_mini2.sh
+```
+
+Runs `audit_label_drift`, `scan_rejection_backlog` (dry-run), `spend_report`,
+and `quiet_jobs_report`. To apply rejection fixes:
+`SCAN_REJECTION_APPLY=1 ./scripts/weekly_ops_mini2.sh`
 
 ---
 

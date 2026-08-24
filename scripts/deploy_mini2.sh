@@ -4,9 +4,6 @@
 #
 #   ./scripts/deploy_mini2.sh
 #
-# For the first post-migration bootstrap only, use bootstrap_mini2_once.sh
-# (delete that script from the repo after it has run once on mini2).
-#
 set -uo pipefail
 
 WORKSPACE_ROOT="${RECRUITING_AUTOMATION_WORKSPACE_ROOT:-$HOME/workspace-recruiting-automation}"
