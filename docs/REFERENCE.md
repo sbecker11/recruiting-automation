@@ -6,9 +6,7 @@ Orchestration layer that ties the two sibling repos together into one
 unattended, scheduled pipeline:
 
 ```
-comms-migration: classify personal_hub      (label + archive recruiter_job etc.)
-        ↓
-comms-migration: classify recruiting_funnel (same, full category taxonomy,
+comms-migration: classify recruiting_funnel (full category taxonomy,
                                                plus a Spam-folder sweep —
                                                rules + high-confidence-only
                                                LLM, rescuing only confirmed

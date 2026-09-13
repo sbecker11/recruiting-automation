@@ -1,7 +1,7 @@
 #!/bin/zsh
 #
 # One tick of the 48-hour recruiting automation window:
-#   comms-migration classify (personal_hub, then recruiting_funnel w/ spam sweep, live+LLM fallback)
+#   comms-migration classify (recruiting_funnel w/ spam sweep, live+LLM fallback)
 #   -> job-tracker triage_recruiter_inbox.py (live, LLM eval + generation on pursue)
 #   -> job-tracker scan_communications.py (LinkedIn replies + Sent-folder matches)
 #   -> job-tracker triage_imap_inbox.py (shawn.becker@spexture.com — the Hostinger IMAP mailbox
@@ -110,9 +110,6 @@ log "=== Cycle start ==="
 # process image with python3 instead of running it as a child, so when
 # `timeout` sends SIGTERM to the wrapper, python3 receives it directly
 # rather than being orphaned while a stuck zsh gets killed out from under it.
-run_step "comms-migration: classify personal_hub (live, LLM fallback default-on)" \
-  zsh -c "cd '$COMMS_REPO' && source .venv/bin/activate && exec python3 scripts/run_classifier.py --account personal_hub --limit 300"
-
 # --include-spam (2026-07-21): verified live that a real recruiter's JD
 # email (CRB Workforce, re: DIRECTV) landed in Spam and sat invisible to
 # every part of this pipeline for a full day — Gmail search excludes

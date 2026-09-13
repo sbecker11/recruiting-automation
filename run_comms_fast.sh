@@ -1,6 +1,6 @@
 #!/bin/zsh
 # Fast lead-communications tick (every 3 minutes via LaunchAgent).
-# Scans recruiting Gmail + personal_hub + Spexture IMAP, refreshes pending-actions,
+# Scans recruiting Gmail + Spexture IMAP, refreshes pending-actions,
 # and fires a macOS notification when new inbound lead mail is archived.
 # Does not open a browser tab (--no-open); the already-open React UI polls JSON.
 set -uo pipefail
