@@ -4,8 +4,8 @@
 #   comms-migration classify (recruiting_funnel w/ spam sweep, live+LLM fallback)
 #   -> job-tracker triage_recruiter_inbox.py (live, LLM eval + generation on pursue)
 #   -> job-tracker scan_communications.py (LinkedIn replies + Sent-folder matches)
-#   -> job-tracker triage_imap_inbox.py (shawn.becker@spexture.com — the Hostinger IMAP mailbox
-#      Gmail-API automation above can never see, both branches combined)
+#   -> job-tracker triage_imap_inbox.py (shawn.becker@spexture.com — Hostinger IMAP,
+#      plus optional sbecker11@icloud.com when ICLOUD_IMAP_* is set)
 #   -> job-tracker process_awaiting_llm_review.py (full-LLM-review sweep for stuck leads)
 #   -> job-tracker resync_labels.py (re-sync stale JobTracker/* labels)
 #   -> job-tracker render_pending_actions.py (static HTML refresh)
@@ -95,7 +95,29 @@ STEP_STALL_KILL_SECS="${RECRUITING_AUTOMATION_STEP_STALL_KILL_SECS:-${RECRUITING
 # depends on chip architecture and how coreutils was installed. Hardcoding
 # the Intel/`--with-default-names` path broke silently anywhere else,
 # including CI's macos-latest runner (Apple Silicon, `gtimeout` only).
-TIMEOUT_BIN="$(command -v timeout || command -v gtimeout || echo /usr/local/bin/timeout)"
+# launchd PATH is often just /usr/bin:/bin, so command -v misses Homebrew.
+# Intel coreutils may be /usr/local/bin/timeout; Apple Silicon is usually
+# /opt/homebrew/bin/gtimeout. Never fall back to a path that does not exist —
+# that produced a false HALT ("exit 0") on mini1's first cycle.
+TIMEOUT_BIN=""
+for _cand in \
+  "$(command -v timeout 2>/dev/null || true)" \
+  "$(command -v gtimeout 2>/dev/null || true)" \
+  /opt/homebrew/bin/gtimeout \
+  /opt/homebrew/bin/timeout \
+  /usr/local/bin/gtimeout \
+  /usr/local/bin/timeout
+do
+  if [[ -n "$_cand" && -x "$_cand" ]]; then
+    TIMEOUT_BIN="$_cand"
+    break
+  fi
+done
+unset _cand
+if [[ -z "$TIMEOUT_BIN" ]]; then
+  echo "run_cycle.sh: GNU timeout not found. brew install coreutils" >&2
+  exit 1
+fi
 
 SCRIPT_DIR="${0:A:h}"
 source "$SCRIPT_DIR/lib/cycle_safety.sh"
@@ -110,6 +132,7 @@ log "=== Cycle start ==="
 # process image with python3 instead of running it as a child, so when
 # `timeout` sends SIGTERM to the wrapper, python3 receives it directly
 # rather than being orphaned while a stuck zsh gets killed out from under it.
+
 # --include-spam (2026-07-21): verified live that a real recruiter's JD
 # email (CRB Workforce, re: DIRECTV) landed in Spam and sat invisible to
 # every part of this pipeline for a full day — Gmail search excludes
@@ -187,6 +210,13 @@ run_step "job-tracker: scan_communications (LinkedIn replies + Sent-folder threa
 # backlog without risking step_stall_kill / HALT.
 run_step "job-tracker: triage_imap_inbox (shawn.becker@spexture.com, live, LLM eval + llm-fallback extraction)" \
   zsh -c "cd '$JOBTRACKER_REPO' && source .venv/bin/activate && $DB_LOCK_PREFIX scripts/triage_imap_inbox.py --imap-prefix SPEXTURE --llm-fallback --inbox-batch-message-cap 30 --inbox-batch-wall-budget-secs 1200"
+
+# sbecker11@icloud.com (and @mac.com / @me.com aliases — same mailbox).
+# 2026-08-28: résumé packages sent with that reply-to never reached the
+# Gmail recruiting funnel. Optional IMAP account (skip if unconfigured);
+# --personal-mailbox never files Apple receipts out of INBOX.
+run_step "job-tracker: triage_imap_inbox (sbecker11@icloud.com, personal mailbox, skip if unconfigured)" \
+  zsh -c "cd '$JOBTRACKER_REPO' && source .venv/bin/activate && $DB_LOCK_PREFIX scripts/triage_imap_inbox.py --imap-prefix ICLOUD --personal-mailbox --newer-than 14 --llm-fallback --inbox-batch-message-cap 30 --inbox-batch-wall-budget-secs 600"
 
 # Closes the "Awaiting full-LLM-review" loop (2026-07-19) — leads whose free
 # rule-based score already cleared the LLM-review gate but never got the

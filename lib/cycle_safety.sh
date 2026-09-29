@@ -115,6 +115,7 @@ run_step() {
   local desc="$1"; shift
   local attempt=0
   local max_attempts=2
+  local rc=0
   while (( attempt < max_attempts )); do
     attempt=$(( attempt + 1 ))
     if (( attempt > 1 )); then
@@ -122,11 +123,15 @@ run_step() {
     else
       log "--- $desc ---"
     fi
+    # zsh: `if cmd; then ...; fi` then `rc=$?` is 0 — the if-compound succeeded.
+    # Capture the timeout/command status in else (see test_cycle_safety.bats
+    # "marks a timeout distinctly"). Regression from the 2026-08-24 lock-retry loop.
     if "$TIMEOUT_BIN" "$STEP_STALL_KILL_SECS" "$@" >>"$LOG" 2>&1; then
       log "OK: $desc"
       return 0
+    else
+      rc=$?
     fi
-    local rc=$?
     if (( rc == 75 && attempt < max_attempts )); then
       log "DB lock busy (exit 75) — retrying $desc once after 60s"
       sleep 60

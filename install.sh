@@ -87,6 +87,11 @@ cat > "$PLIST_PATH" <<PLIST
   <integer>3600</integer>
   <key>RunAtLoad</key>
   <true/>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
   <key>StandardOutPath</key>
   <string>$BASE/logs/launchd.out.log</string>
   <key>StandardErrorPath</key>

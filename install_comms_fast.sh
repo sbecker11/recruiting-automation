@@ -26,6 +26,11 @@ cat >"$PLIST_PATH" <<PLIST
   <integer>$INTERVAL</integer>
   <key>RunAtLoad</key>
   <true/>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
   <key>StandardOutPath</key>
   <string>$BASE/logs/comms_fast.launchd.out.log</string>
   <key>StandardErrorPath</key>
