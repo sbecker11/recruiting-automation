@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" data-icon-viewbox="420 140 860 860">
+<defs>
+<marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#cbd5e1"/></marker>
+<style>
+text { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; }
+.title { font-size: 40px; font-weight: 700; fill: #f8fafc; }
+.subtitle { font-size: 22px; fill: #94a3b8; }
+.group { font-size: 19px; font-weight: 600; fill: #94a3b8; }
+.name { font-size: 25px; font-weight: 700; fill: #f8fafc; text-anchor: middle; }
+.sub { font-size: 18px; fill: #cbd5e1; text-anchor: middle; }
+.edge { font-size: 16px; fill: #e2e8f0; text-anchor: middle; }
+.note { font-size: 18px; fill: #94a3b8; }
+</style>
+</defs>
+<rect width="1600" height="1000" fill="#0f172a"/>
+<text x="60" y="78" class="title">recruiting-automation</text>
+<text x="60" y="114" class="subtitle">Hourly launchd pipeline: inbox → leads → LLM review → tailored packages</text>
+<rect x="60" y="200" width="320" height="110" rx="14" fill="#1e3a5f" stroke="#7dd3fc" stroke-width="2.5"/>
+<text x="220" y="249" class="name">launchd</text>
+<text x="220" y="279" class="sub">hourly schedule</text>
+<rect x="60" y="380" width="320" height="110" rx="14" fill="#1e3a5f" stroke="#7dd3fc" stroke-width="2.5"/>
+<text x="220" y="429" class="name">run_cycle.sh</text>
+<text x="220" y="459" class="sub">ordered steps · timeouts</text>
+<rect x="60" y="560" width="320" height="110" rx="14" fill="#4a3f14" stroke="#fde047" stroke-width="2.5"/>
+<text x="220" y="609" class="name">HALT / safety</text>
+<text x="220" y="639" class="sub">stop + notify on failure</text>
+<rect x="460" y="200" width="360" height="110" rx="14" fill="#334155" stroke="#cbd5e1" stroke-width="2.5"/>
+<text x="640" y="249" class="name">Gmail + IMAP inboxes</text>
+<text x="640" y="279" class="sub">recruiter mail</text>
+<rect x="460" y="380" width="360" height="110" rx="14" fill="#134e4a" stroke="#5eead4" stroke-width="2.5"/>
+<text x="640" y="429" class="name">Inbox classifier</text>
+<text x="640" y="459" class="sub">rules + Claude Haiku</text>
+<rect x="460" y="560" width="360" height="110" rx="14" fill="#3b2f5c" stroke="#c4b5fd" stroke-width="2.5"/>
+<text x="640" y="609" class="name">Lead triage</text>
+<text x="640" y="639" class="sub">JD extraction</text>
+<rect x="460" y="740" width="360" height="110" rx="14" fill="#3b2f5c" stroke="#c4b5fd" stroke-width="2.5"/>
+<text x="640" y="789" class="name">Leads DB</text>
+<text x="640" y="819" class="sub">SQLite (WAL + lock)</text>
+<rect x="900" y="380" width="340" height="110" rx="14" fill="#3b2f5c" stroke="#c4b5fd" stroke-width="2.5"/>
+<text x="1070" y="429" class="name">Rule-based scoring</text>
+<text x="1070" y="459" class="sub">dealbreakers · match %</text>
+<rect x="900" y="560" width="340" height="110" rx="14" fill="#4a3420" stroke="#fdba74" stroke-width="2.5"/>
+<text x="1070" y="609" class="name">LLM evaluation</text>
+<text x="1070" y="639" class="sub">Claude · gate ≥ 70%</text>
+<rect x="900" y="740" width="340" height="110" rx="14" fill="#3b2f5c" stroke="#c4b5fd" stroke-width="2.5"/>
+<text x="1070" y="789" class="name">Résumé + cover letter</text>
+<text x="1070" y="819" class="sub">python-docx on pursue</text>
+<rect x="1300" y="740" width="240" height="110" rx="14" fill="#3b2f5c" stroke="#c4b5fd" stroke-width="2.5"/>
+<text x="1420" y="789" class="name">Pending Actions</text>
+<text x="1420" y="819" class="sub">React + Vite</text>
+<polyline points="220,310 220,380" fill="none" stroke="#cbd5e1" stroke-width="2.5" marker-end="url(#arrow)"/>
+<rect x="192.8" y="330" width="54.4" height="28" rx="6" fill="#0f172a" opacity="0.92"/>
+<text x="220" y="351" class="edge">tick</text>
+<polyline points="220,490 220,560" fill="none" stroke="#cbd5e1" stroke-width="2.5" stroke-dasharray="8 6" marker-end="url(#arrow)"/>
+<rect x="135.2" y="510" width="169.6" height="28" rx="6" fill="#0f172a" opacity="0.92"/>
+<text x="220" y="531" class="edge">failure / expiry</text>
+<polyline points="380,435 460,435" fill="none" stroke="#cbd5e1" stroke-width="2.5" marker-end="url(#arrow)"/>
+<rect x="368.8" y="420" width="102.39999999999999" height="28" rx="6" fill="#0f172a" opacity="0.92"/>
+<text x="420" y="441" class="edge">run steps</text>
+<polyline points="640,310 640,380" fill="none" stroke="#cbd5e1" stroke-width="2.5" marker-end="url(#arrow)"/>
+<rect x="593.6" y="330" width="92.8" height="28" rx="6" fill="#0f172a" opacity="0.92"/>
+<text x="640" y="351" class="edge">messages</text>
+<polyline points="640,490 640,560" fill="none" stroke="#cbd5e1" stroke-width="2.5" marker-end="url(#arrow)"/>
+<rect x="540.8" y="510" width="198.4" height="28" rx="6" fill="#0f172a" opacity="0.92"/>
+<text x="640" y="531" class="edge">recruiter_job label</text>
+<polyline points="640,670 640,740" fill="none" stroke="#cbd5e1" stroke-width="2.5" marker-end="url(#arrow)"/>
+<rect x="574.4" y="690" width="131.2" height="28" rx="6" fill="#0f172a" opacity="0.92"/>
+<text x="640" y="711" class="edge">upsert leads</text>
+<polyline points="820,595 860,595 860,435 900,435" fill="none" stroke="#cbd5e1" stroke-width="2.5" marker-end="url(#arrow)"/>
+<rect x="818.4" y="500" width="83.2" height="28" rx="6" fill="#0f172a" opacity="0.92"/>
+<text x="860" y="521" class="edge">JD text</text>
+<polyline points="1070,490 1070,560" fill="none" stroke="#cbd5e1" stroke-width="2.5" marker-end="url(#arrow)"/>
+<rect x="1009.2" y="510" width="121.6" height="28" rx="6" fill="#0f172a" opacity="0.92"/>
+<text x="1070" y="531" class="edge">match ≥ 70%</text>
+<polyline points="1070,670 1070,740" fill="none" stroke="#cbd5e1" stroke-width="2.5" marker-end="url(#arrow)"/>
+<rect x="1033.2" y="690" width="73.6" height="28" rx="6" fill="#0f172a" opacity="0.92"/>
+<text x="1070" y="711" class="edge">pursue</text>
+<polyline points="1240,795 1300,795" fill="none" stroke="#cbd5e1" stroke-width="2.5" marker-end="url(#arrow)"/>
+<polyline points="640,850 640,900 1420,900 1420,850" fill="none" stroke="#cbd5e1" stroke-width="2.5" marker-end="url(#arrow)"/>
+<rect x="950" y="885" width="160" height="28" rx="6" fill="#0f172a" opacity="0.92"/>
+<text x="1030" y="906" class="edge">decision queues</text>
+<rect x="60" y="942" width="26" height="26" rx="6" fill="#1e3a5f" stroke="#7dd3fc" stroke-width="2"/>
+<text x="98" y="962" class="note">recruiting-automation</text>
+<rect x="350" y="942" width="26" height="26" rx="6" fill="#134e4a" stroke="#5eead4" stroke-width="2"/>
+<text x="388" y="962" class="note">comms-migration</text>
+<rect x="640" y="942" width="26" height="26" rx="6" fill="#3b2f5c" stroke="#c4b5fd" stroke-width="2"/>
+<text x="678" y="962" class="note">job-tracker</text>
+<rect x="930" y="942" width="26" height="26" rx="6" fill="#4a3420" stroke="#fdba74" stroke-width="2"/>
+<text x="968" y="962" class="note">Claude (Anthropic)</text>
+</svg>

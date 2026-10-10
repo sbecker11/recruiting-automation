@@ -1,5 +1,7 @@
 # recruiting-automation
 
+<a href="https://raw.githubusercontent.com/sbecker11/recruiting-automation/main/docs/architecture.png" target="_blank" rel="noopener noreferrer"><img src="docs/architecture-icon.png" width="420" height="420" alt="recruiting-automation architecture (click for the full diagram)"></a>
+
 **Orchestration only** — schedules and wraps sibling CLIs. Owns none of the
 routing or JD/package business logic.
 
