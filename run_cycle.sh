@@ -229,6 +229,12 @@ run_step "job-tracker: triage_imap_inbox (sbecker11@icloud.com, personal mailbox
 # pipeline per lead (full review always, résumé+cover-letter only on an
 # actual "pursue"), so cost is bounded by however many leads are actually
 # eligible, not a flat rate — see cli/process_awaiting_llm_review.py.
+# Standing auto-skip rules (CLAUDE.md §3, 2026-10-09): new/pursued leads with
+# no communication in 21+ days, or remote-but-Eastern-time-only JDs. Runs
+# before the LLM sweep so stale leads never cost a review.
+run_step "job-tracker: auto_skip_leads (no communication 21+ days, Eastern-time-only remote)" \
+  zsh -c "cd '$JOBTRACKER_REPO' && source .venv/bin/activate && $DB_LOCK_PREFIX scripts/auto_skip_leads.py"
+
 run_step "job-tracker: process_awaiting_llm_review (full-LLM-review sweep for leads stuck past the score gate)" \
   zsh -c "cd '$JOBTRACKER_REPO' && source .venv/bin/activate && $DB_LOCK_PREFIX scripts/process_awaiting_llm_review.py"
 
