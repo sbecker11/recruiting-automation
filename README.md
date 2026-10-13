@@ -1,12 +1,12 @@
 # recruiting-automation
 
+<a href="https://raw.githubusercontent.com/sbecker11/recruiting-automation/main/docs/architecture.png" target="_blank" rel="noopener noreferrer"><img src="docs/architecture-icon.png" width="420" height="420" alt="recruiting-automation architecture (click for the full diagram)"></a>
+
 <!-- SUMMARY:START generated from workspace-linkedin-profile/Projects.json by scripts/build_readme_header.py; edit there -->
 launchd-scheduled pipeline orchestrating inbox classification, Gmail triage, LLM job-description evaluation, and tailored résumé and cover-letter generation.
 
 **Skills:** Python (Programming Language) · Bash/Shell Scripting · launchd · Large Language Models (LLM) · Anthropic Claude API · Natural Language Processing (NLP) · Machine Learning · Gmail API · Google OAuth · REST APIs · FastAPI · Jinja2 · python-docx · BeautifulSoup · PyYAML · git-crypt · Data Engineering · Bats · pytest · Automated Software Testing (JUnit/Jest/Vitest/PyTest)
 <!-- SUMMARY:END -->
-
-<a href="https://raw.githubusercontent.com/sbecker11/recruiting-automation/main/docs/architecture.png" target="_blank" rel="noopener noreferrer"><img src="docs/architecture-icon.png" width="420" height="420" alt="recruiting-automation architecture (click for the full diagram)"></a>
 
 **Orchestration only** — schedules and wraps sibling CLIs. Owns none of the
 routing or JD/package business logic.
