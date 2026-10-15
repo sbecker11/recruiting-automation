@@ -1,8 +1,8 @@
 #!/bin/zsh
-# Routine deploy for mini2 (or any production host).
+# Routine deploy on the pipeline host.
 # Pulls all three sibling repos, refreshes job-tracker venv, verifies health.
 #
-#   ./scripts/deploy_mini2.sh
+#   ./scripts/deploy.sh
 #
 set -uo pipefail
 

@@ -1,8 +1,7 @@
 # Recruiting pipeline migration plan
 
 **Created:** 2026-08-24 (reconstructed from Aug 23 planning sessions)  
-**Production host:** mini2 (`~/workspace-recruiting-automation`)  
-**Dev host:** mini1 / Cursor (local clone; do not edit prod over SMB)
+**Host:** mini1 (`~/workspace-recruiting-automation`) — runs the live pipeline and is where Cursor development happens
 
 ---
 
@@ -26,23 +25,18 @@ This plan covers **Track A** (pipeline improvement Phases 0–6). **Track B** is
 
 ---
 
-## mini1 ↔ mini2 workflow
+## Single-host workflow
 
-| | mini2 (production) | mini1 (dev) |
-|---|-------------------|-------------|
-| Pipeline | launchd hourly + 3-min comms_fast | Not loaded (expected) |
-| Code | Checked-out repos | Local git clone |
-| Data | `leads.db`, OAuth, `state/`, logs | Does not drive live pipeline |
+mini1 runs the launchd hourly cycle + 3-min comms_fast and holds the live data
+(`leads.db`, OAuth, `state/`, logs). Code is edited in the same checked-out
+repos the schedule runs, so:
 
-**Safe deploy while mini2 runs:**
+1. Run `./status.sh` before changing code (confirm cycle idle; look for `=== Cycle complete ===` in latest log)
+2. Develop + test → commit → push
+3. If Python dependencies changed: `cd job-tracker && source .venv/bin/activate && pip install -e ".[dev]"`
+4. Verify: `./status.sh`, `./monday.sh`
 
-1. Develop + test on mini1 → commit → push
-2. SSH mini2 → `./status.sh` (confirm cycle idle; look for `=== Cycle complete ===` in latest log)
-3. `git pull` in all three repos
-4. If Python changed: `cd job-tracker && source .venv/bin/activate && pip install -e ".[dev]"`
-5. Verify: `./status.sh`, `./monday.sh`
-
-**Avoid:** editing mini2 files over `/Volumes/sbecker11/...` SMB; `git pull` mid-cycle; `./install.sh` unless clearing HALT / restarting window.
+**Avoid:** writing to `leads.db` outside `scripts/with_db_lock.py` while the schedule runs; `./install.sh` unless clearing HALT / restarting window.
 
 ---
 
@@ -201,7 +195,7 @@ Phase 4 can overlap 2/3. Phase 6 stays open throughout.
 
 ---
 
-**Last updated:** 2026-08-24 — Phases 0–6 **code complete**; mini2 deploy pending (`./scripts/deploy_mini2.sh`).
+**Last updated:** 2026-10-14 — Phases 0–6 **code complete** and running on mini1 (the only pipeline host).
 
 ---
 
@@ -215,44 +209,23 @@ Phase 4 can overlap 2/3. Phase 6 stays open throughout.
 | **3** | Shipped | `audit_label_drift.py`, `label_drift.py`, drift in `status.sh` |
 | **4** | Shipped | `spend_report.py`, spend in `status.sh` / `kpi_snapshot --check-spend` |
 | **5** | Shipped | `quiet_jobs_report.py`, `offer_comparison.py`, `market_withdrawal_draft.py` |
-| **6** | Shipped | DB-lock retry (exit 75), lock wait telemetry, HALT hints, `deploy_mini2.sh` |
-
-**Your action (one time on mini2):**
-
-```bash
-cd ~/workspace-recruiting-automation/recruiting-automation
-./scripts/deploy_mini2.sh
-```
+| **6** | Shipped | DB-lock retry (exit 75), lock wait telemetry, HALT hints, `deploy.sh` |
 
 ---
 
-## Day 0–1 checklist
-
-### Day 0 — mini1
-
-- [x] Phase 0/1 code committed and pushed
-- [x] Phases 2–6 code committed and pushed
-
-### Day 1 — mini2 (unattended deploy script)
-
-- [ ] Run `./scripts/deploy_mini2.sh` on mini2 between cycles
-- [ ] Confirm `./status.sh` shows KPIs + framework sync OK
-- [ ] Run `./monday.sh` once
-
-### Ongoing ops (weekly)
+## Ongoing ops (weekly)
 
 ```bash
 cd ~/workspace-recruiting-automation/recruiting-automation
-./scripts/weekly_ops_mini2.sh
+./scripts/weekly_ops.sh
 ```
 
 Runs `audit_label_drift`, `scan_rejection_backlog` (dry-run), `spend_report`,
 and `quiet_jobs_report`. To apply rejection fixes:
-`SCAN_REJECTION_APPLY=1 ./scripts/weekly_ops_mini2.sh`
+`SCAN_REJECTION_APPLY=1 ./scripts/weekly_ops.sh`
 
----
-
-## Day 0–1 checklist (archived)
+`./scripts/deploy.sh` pulls all three repos, refreshes the job-tracker venv,
+and runs `./status.sh` — use it after pushing from another clone.
 
 ---
 

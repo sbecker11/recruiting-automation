@@ -43,8 +43,8 @@ unlock per [`../SECRETS.md`](../SECRETS.md)).
 | Goal | Command |
 |------|---------|
 | **Monday briefing** | `./monday.sh` |
-| Deploy on mini2 | `./scripts/deploy_mini2.sh` |
-| Weekly ops on mini2 | `./scripts/weekly_ops_mini2.sh` |
+| Deploy (pull, refresh venv, health check) | `./scripts/deploy.sh` |
+| Weekly ops | `./scripts/weekly_ops.sh` |
 | Is it healthy? | `./status.sh` (add `--json` for scripts) |
 | Restart after HALT | `./install.sh` |
 | Stop | `./stop.sh` |
