@@ -23,10 +23,19 @@ text { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; }
 <text x="220" y="459" class="sub">ordered steps · timeouts</text>
 <rect x="60" y="560" width="320" height="110" rx="14" fill="#4a3f14" stroke="#fde047" stroke-width="2.5"/>
 <text x="220" y="609" class="name">HALT / safety</text>
-<text x="220" y="639" class="sub">stop + notify on failure</text>
+<text x="220" y="639" class="sub">net / quota errors defer</text>
+<rect x="60" y="740" width="320" height="110" rx="14" fill="#3b2f5c" stroke="#c4b5fd" stroke-width="2.5"/>
+<text x="220" y="789" class="name">Auto-skip</text>
+<text x="220" y="819" class="sub">quiet 21 days · Eastern-only</text>
 <rect x="460" y="200" width="360" height="110" rx="14" fill="#334155" stroke="#cbd5e1" stroke-width="2.5"/>
 <text x="640" y="249" class="name">Gmail + IMAP inboxes</text>
 <text x="640" y="279" class="sub">recruiter mail</text>
+<rect x="900" y="200" width="340" height="110" rx="14" fill="#3b2f5c" stroke="#c4b5fd" stroke-width="2.5"/>
+<text x="1070" y="249" class="name">Reply matching</text>
+<text x="1070" y="279" class="sub">thread · LinkedIn convo · contact</text>
+<rect x="1300" y="200" width="240" height="110" rx="14" fill="#3b2f5c" stroke="#c4b5fd" stroke-width="2.5"/>
+<text x="1420" y="249" class="name">Unmatched</text>
+<text x="1420" y="279" class="sub">1 per conversation</text>
 <rect x="460" y="380" width="360" height="110" rx="14" fill="#134e4a" stroke="#5eead4" stroke-width="2.5"/>
 <text x="640" y="429" class="name">Inbox classifier</text>
 <text x="640" y="459" class="sub">rules + Claude Haiku</text>
@@ -52,8 +61,16 @@ text { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; }
 <rect x="192.8" y="330" width="54.4" height="28" rx="6" fill="#0f172a" opacity="0.92"/>
 <text x="220" y="351" class="edge">tick</text>
 <polyline points="220,490 220,560" fill="none" stroke="#cbd5e1" stroke-width="2.5" stroke-dasharray="8 6" marker-end="url(#arrow)"/>
-<rect x="135.2" y="510" width="169.6" height="28" rx="6" fill="#0f172a" opacity="0.92"/>
-<text x="220" y="531" class="edge">failure / expiry</text>
+<rect x="154.4" y="510" width="131.2" height="28" rx="6" fill="#0f172a" opacity="0.92"/>
+<text x="220" y="531" class="edge">real failure</text>
+<polyline points="380,795 460,795" fill="none" stroke="#cbd5e1" stroke-width="2.5" marker-end="url(#arrow)"/>
+<polyline points="820,255 900,255" fill="none" stroke="#cbd5e1" stroke-width="2.5" marker-end="url(#arrow)"/>
+<rect x="818.4" y="240" width="83.2" height="28" rx="6" fill="#0f172a" opacity="0.92"/>
+<text x="860" y="261" class="edge">replies</text>
+<polyline points="1240,255 1300,255" fill="none" stroke="#cbd5e1" stroke-width="2.5" marker-end="url(#arrow)"/>
+<polyline points="1420,310 1420,740" fill="none" stroke="#cbd5e1" stroke-width="2.5" marker-end="url(#arrow)"/>
+<rect x="1378.4" y="510" width="83.2" height="28" rx="6" fill="#0f172a" opacity="0.92"/>
+<text x="1420" y="531" class="edge">clarify</text>
 <polyline points="380,435 460,435" fill="none" stroke="#cbd5e1" stroke-width="2.5" marker-end="url(#arrow)"/>
 <rect x="368.8" y="420" width="102.39999999999999" height="28" rx="6" fill="#0f172a" opacity="0.92"/>
 <text x="420" y="441" class="edge">run steps</text>
