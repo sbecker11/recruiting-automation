@@ -218,6 +218,16 @@ run_step "job-tracker: triage_imap_inbox (shawn.becker@spexture.com, live, LLM e
 run_step "job-tracker: triage_imap_inbox (sbecker11@icloud.com, personal mailbox, skip if unconfigured)" \
   zsh -c "cd '$JOBTRACKER_REPO' && source .venv/bin/activate && $DB_LOCK_PREFIX scripts/triage_imap_inbox.py --imap-prefix ICLOUD --personal-mailbox --newer-than 14 --llm-fallback --inbox-batch-message-cap 30 --inbox-batch-wall-budget-secs 600"
 
+# LLM catch-up for parked InMails (2026-10-19). The 3-minute comms tick
+# parks LinkedIn pitches the free heuristic can't parse before this hourly
+# run's --llm-fallback ever sees them (is_communication_seen skips them, and
+# IMAP copies have already left INBOX). This pass reads the stored message
+# text, so it covers every mailbox; one cached extraction per message, so a
+# re-run never re-bills. Runs before auto_skip / the LLM-review sweep so
+# new leads get reviewed this same cycle.
+run_step "job-tracker: promote_unmatched_llm (LLM extraction for parked InMails)" \
+  zsh -c "cd '$JOBTRACKER_REPO' && source .venv/bin/activate && $DB_LOCK_PREFIX scripts/promote_unmatched_llm.py --newer-than 21 --limit 20"
+
 # Closes the "Awaiting full-LLM-review" loop (2026-07-19) — leads whose free
 # rule-based score already cleared the LLM-review gate but never got the
 # real LLM call, most commonly scan_communications's own stub leads (that
