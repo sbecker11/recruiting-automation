@@ -14,6 +14,7 @@ bats tests/test_cycle_safety.bats  # one file
 | `test_cycle_safety.bats` | `lib/cycle_safety.sh`: `run_step` (success/failure/timeout), `preflight_check` (HALT sentinel, expired/unexpired 48h window), the `SIGTERM` shutdown trap |
 | `test_ensure_running.bats` | `ensure_running.sh`'s restart-vs-no-op decision (label not loaded, HALT present, expired window even while loaded, or genuinely loaded+unexpired+healthy), and that its restart reason is passed through to `install.sh` via `RECRUITING_AUTOMATION_INSTALL_REASON` |
 | `test_install.bats` | `install.sh`: clears HALT, writes a correct `expiry_epoch` (default, from `.env`, and CLI-arg-overrides-`.env`), writes `state/window_hours` and `logs/install.log` with the right source/reason, writes a valid plist, actually bootstraps, is idempotent |
+| `test_schedule_rules.bats` | job-tracker `docs/REQUIREMENTS.md` SYS-1/3/4/5: hourly step order, every DB-writing job-tracker step goes through the DB lock, the 1800 s step timeout, the exit-75 lock retry, and that HALT never stops the 3-minute intake tick |
 | `test_status_stop.bats` | `status.sh`/`stop.sh`: basic reporting/sentinel-writing sanity, configured-window display, install-history and recent-cycle-outcome reporting, and that the sibling `ANTHROPIC_API_KEY` check safely no-ops for a nonexistent repo |
 
 **Deliberately not covered here:** the real `comms-migration`/`job-tracker`
