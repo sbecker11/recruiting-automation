@@ -18,7 +18,7 @@ comms-migration (classify)
 ```
 
 Umbrella install / ops: [`../README.md`](../README.md) (or [`docs/WORKSPACE.md`](docs/WORKSPACE.md))  
-Secrets / git-crypt: [`../SECRETS.md`](../SECRETS.md) (or [`docs/SECRETS.md`](docs/SECRETS.md))  
+Secrets / git-crypt: [`../SECRETS.md`](docs/SECRETS.md) (or [`docs/SECRETS.md`](docs/SECRETS.md))  
 Full historical detail: [`docs/REFERENCE.md`](docs/REFERENCE.md)
 
 ## Quick start
@@ -32,7 +32,7 @@ brew install bats-core          # for tests
 ```
 
 Optional local override: `.env` with `WINDOW_HOURS=…` (git-crypt encrypted —
-unlock per [`../SECRETS.md`](../SECRETS.md)).
+unlock per [`../SECRETS.md`](docs/SECRETS.md)).
 
 ```bash
 ./stop.sh                       # intentional stop

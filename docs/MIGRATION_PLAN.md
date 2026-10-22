@@ -21,7 +21,7 @@ Turn inbound recruiting noise into **a small, trustworthy set of pursue-worthy j
 
 ## Two parallel tracks
 
-This plan covers **Track A** (pipeline improvement Phases 0–6). **Track B** is the longer communications consolidation in [`comms-migration/comms-migration-runbook.md`](comms-migration/comms-migration-runbook.md) (Nextiva, hub migration, sender lists). Track B proceeds independently; Track A assumes mail already flows into the hourly cycle.
+This plan covers **Track A** (pipeline improvement Phases 0–6). **Track B** is the longer communications consolidation in [`comms-migration/comms-migration-runbook.md`](../../comms-migration/comms-migration-runbook.md) (Nextiva, hub migration, sender lists). Track B proceeds independently; Track A assumes mail already flows into the hourly cycle.
 
 ---
 
@@ -139,7 +139,7 @@ cd recruiting-automation && ./monday.sh
 
 **Goal:** relationship continuity after triage (vision UC-7–9).
 
-**Ref:** [`job-tracker/docs/JOB_CRM_VISION.md`](job-tracker/docs/JOB_CRM_VISION.md)
+**Ref:** [`job-tracker/docs/JOB_CRM_VISION.md`](../../job-tracker/docs/JOB_CRM_VISION.md)
 
 | Work | Owner | Deliverable |
 |------|-------|-------------|
@@ -249,11 +249,11 @@ and runs `./status.sh` — use it after pushing from another clone.
 
 | Doc | Path |
 |-----|------|
-| Umbrella ops | [`README.md`](README.md) |
-| Comms consolidation (Track B) | [`comms-migration/comms-migration-runbook.md`](comms-migration/comms-migration-runbook.md) |
-| Pipeline stages | [`job-tracker/PRIMER.md`](job-tracker/PRIMER.md) |
-| CRM vision | [`job-tracker/docs/JOB_CRM_VISION.md`](job-tracker/docs/JOB_CRM_VISION.md) |
-| Routing inventory | [`comms-migration/routing-inventory.md`](comms-migration/routing-inventory.md) |
+| Umbrella ops | [`README.md`](../../README.md) |
+| Comms consolidation (Track B) | [`comms-migration/comms-migration-runbook.md`](../../comms-migration/comms-migration-runbook.md) |
+| Pipeline stages | [`job-tracker/PRIMER.md`](../../job-tracker/PRIMER.md) |
+| CRM vision | [`job-tracker/docs/JOB_CRM_VISION.md`](../../job-tracker/docs/JOB_CRM_VISION.md) |
+| Routing inventory | [`comms-migration/routing-inventory.md`](../../comms-migration/routing-inventory.md) |
 | Status / Monday | `recruiting-automation/status.sh`, `recruiting-automation/monday.sh` |
 
 ---

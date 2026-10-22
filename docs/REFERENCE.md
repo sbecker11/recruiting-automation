@@ -49,8 +49,8 @@ opening the message).
 Each step is a real repo's own CLI script (`run_cycle.sh` just calls them in
 order with a per-step timeout) — this directory owns none of the actual
 business logic, only the scheduling/safety wrapper around it. See:
-- [`comms-migration` README](../comms-migration/README.md)
-- [`job-tracker` README](../job-tracker/README.md)
+- [`comms-migration` README](../../comms-migration/README.md)
+- [`job-tracker` README](../../job-tracker/README.md)
 
 ## Project layout
 
