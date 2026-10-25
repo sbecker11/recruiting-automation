@@ -248,6 +248,13 @@ run_step "job-tracker: auto_skip_leads (no communication 21+ days, Eastern-time-
 run_step "job-tracker: process_awaiting_llm_review (full-LLM-review sweep for leads stuck past the score gate)" \
   zsh -c "cd '$JOBTRACKER_REPO' && source .venv/bin/activate && $DB_LOCK_PREFIX scripts/process_awaiting_llm_review.py"
 
+# Required-skills extraction (2026-10-24) for wheelhouse leads that are new
+# or whose JD/messages changed (unchanged leads are skipped by input hash),
+# then the global skills page. Takes the DB lock per write rather than for
+# the whole step, and stops at --max-cost.
+run_step "job-tracker: extract_required_skills (new/changed wheelhouse leads) + analyze_skills" \
+  zsh -c "cd '$JOBTRACKER_REPO' && source .venv/bin/activate && python3 scripts/extract_required_skills.py --apply --create-folders --lock var/comms_fast.lock --max-cost 1 --workers 2 && exec python3 scripts/analyze_skills.py --apply --copy-to ~/Desktop/Resumes/2026/Skills_Analysis.html"
+
 # Re-syncs each already-triaged message's JobTracker/PURSUE|SKIP|
 # NEEDS_REVIEW label to its lead(s)' CURRENT verdict (2026-07-19) — without
 # this, a label frozen at initial-triage time silently goes stale the moment

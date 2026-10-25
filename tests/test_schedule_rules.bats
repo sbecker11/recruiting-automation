@@ -28,6 +28,7 @@ triage_imap_inbox
 promote_unmatched_llm
 auto_skip_leads
 process_awaiting_llm_review
+extract_required_skills
 resync_labels
 render_pending_actions
 render_contacts"
@@ -38,9 +39,9 @@ render_contacts"
 
 @test "SYS-3: every hourly job-tracker step that writes leads.db goes through the DB lock" {
   grep -q 'DB_LOCK_PREFIX="exec python3 scripts/with_db_lock.py --lock var/comms_fast.lock' "$CYCLE"
-  # resync_labels (Gmail labels only) and render_contacts (read-only) are the
-  # only job-tracker steps allowed to skip the lock.
-  run zsh -c "grep \"cd '\\\$JOBTRACKER_REPO'\" '$CYCLE' | grep -v 'DB_LOCK_PREFIX' | grep -v -e 'scripts/resync_labels.py' -e 'scripts/render_contacts.py'"
+  # resync_labels (Gmail labels only) and render_contacts (read-only) skip the
+  # lock; extract_required_skills takes it per write via --lock instead.
+  run zsh -c "grep \"cd '\\\$JOBTRACKER_REPO'\" '$CYCLE' | grep -v 'DB_LOCK_PREFIX' | grep -v -e 'scripts/resync_labels.py' -e 'scripts/render_contacts.py' -e 'scripts/extract_required_skills.py --apply --create-folders --lock var/comms_fast.lock'"
   [ -z "$output" ]
 }
 
