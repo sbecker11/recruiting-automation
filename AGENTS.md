@@ -34,6 +34,19 @@ Do **not** invent or hardcode Shawn’s experience, rates, or house rules here.
 - `install.sh` — safe to re-run anytime to clear halt and restart
 - `status.sh` — first command for “is it healthy?”
 
+## Standing authority to restart (granted by Shawn 2026-11-03)
+
+Whenever an agent finds the schedule stopped (`state/HALT` present, or the
+window expired), it may restart it without asking:
+
+1. Read the HALT reason and the tail of the newest `logs/run-*.log`.
+2. Run `./install.sh` (no args, so `.env`'s `WINDOW_HOURS` is kept), then `./status.sh`.
+3. Tell Shawn it was stopped, why, and that it was restarted.
+
+Do not restart if the cause needs Shawn himself (e.g. an interactive Google
+re-login) — tell him what to do instead. If it HALTs again on the same step
+right after a restart, stop and report rather than looping.
+
 ## Venv gotcha
 
 Sibling `.venv/` dirs are **not relocatable**. After moving repos, recreate
