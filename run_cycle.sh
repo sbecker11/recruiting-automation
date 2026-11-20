@@ -36,7 +36,7 @@ set -uo pipefail
 # only affecting which repo run_cycle.sh itself calls into.
 WORKSPACE_ROOT="${RECRUITING_AUTOMATION_WORKSPACE_ROOT:-$HOME/workspace-recruiting-automation}"
 export RECRUITING_AUTOMATION_WORKSPACE_ROOT="$WORKSPACE_ROOT"
-# job_tracker's ANTHROPIC_API_KEY-source diagnostic (job_tracker/__init__.py)
+# job_tracker's CURSOR_API_KEY-source diagnostic (job_tracker/__init__.py)
 # is opt-in via this var — quiet by default for interactive CLI use, but the
 # unattended hourly cycle wants it durably in its own log file.
 export JOB_TRACKER_LOG_ENV_SOURCE=1

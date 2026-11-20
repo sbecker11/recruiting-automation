@@ -12,7 +12,7 @@ setup() {
   PLIST_LABEL="com.sbecker11.recruiting-automation-TEST-$$"
   PLIST_PATH="$TEST_DIR/fake.plist"
   REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
-  # Deliberately nonexistent — status.sh's ANTHROPIC_API_KEY section must
+  # Deliberately nonexistent — status.sh's CURSOR_API_KEY section must
   # degrade to "no .venv found — skipped" for these rather than ever
   # touching the real job-tracker/comms-migration repos or their venvs.
   FAKE_COMMS_REPO="$TEST_DIR/no-such-comms-migration"
@@ -106,7 +106,7 @@ LOG
   [[ "$output" == *"run-20260101-010000.log: STOPPED: 48-hour window complete"* ]]
 }
 
-@test "status.sh skips the ANTHROPIC_API_KEY check for a nonexistent sibling repo" {
+@test "status.sh skips the CURSOR_API_KEY check for a nonexistent sibling repo" {
   run_status
   [[ "$output" == *"no .venv found"* ]]
 }

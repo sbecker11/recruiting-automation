@@ -2,7 +2,7 @@
 # Quick status check: is the schedule loaded, is it halted, how much time is
 # left, latest log tail, recent install history, recent cycle outcomes,
 # decision-queue KPIs, framework sync, and whether both sibling repos actually
-# have ANTHROPIC_API_KEY available.
+# have CURSOR_API_KEY available.
 #
 #   ./status.sh          # human-readable
 #   ./status.sh --json   # machine-readable KPI + schedule snapshot
@@ -20,12 +20,12 @@ fi
 
 # See install.sh's comment on WORKSPACE_ROOT — single source of truth for
 # the sibling-repos parent dir, shared across every script here. Exported
-# for the same reason as run_cycle.sh: the ANTHROPIC_API_KEY check below
+# for the same reason as run_cycle.sh: the CURSOR_API_KEY check below
 # spawns real job_tracker/classifier Python imports, which check this same
 # var themselves before falling back to their own file-relative derivation.
 WORKSPACE_ROOT="${RECRUITING_AUTOMATION_WORKSPACE_ROOT:-$HOME/workspace-recruiting-automation}"
 export RECRUITING_AUTOMATION_WORKSPACE_ROOT="$WORKSPACE_ROOT"
-# job_tracker's own ANTHROPIC_API_KEY-source diagnostic is opt-in (quiet for
+# job_tracker's own CURSOR_API_KEY-source diagnostic is opt-in (quiet for
 # interactive CLI use elsewhere — see job_tracker/__init__.py) but the health
 # check below spawns a real `import job_tracker` specifically to see that
 # line, so it needs to opt back in here too.
@@ -201,7 +201,7 @@ echo "--- decision-queue KPIs ---"
 _kpi_section
 
 echo ""
-echo "--- ANTHROPIC_API_KEY (siblings) ---"
+echo "--- CURSOR_API_KEY (siblings) ---"
 # NOTE: variables must be braced (${VAR}, not $VAR) before an immediately
 # following ":letter" — zsh parses unbraced "$VAR:c" as a history-style
 # modifier expansion (silently consuming the "c"), not literal text. Bit
