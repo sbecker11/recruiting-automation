@@ -1,6 +1,6 @@
 # recruiting-automation
 
-<a href="https://raw.githubusercontent.com/sbecker11/recruiting-automation/main/docs/architecture.png" target="_blank" rel="noopener noreferrer"><img src="docs/architecture-icon.png" width="420" height="420" alt="recruiting-automation architecture (click for the full diagram)"></a>
+<a href="https://raw.githubusercontent.com/sbecker11/recruiting-automation/main/docs/architecture.png" target="_blank" rel="noopener noreferrer"><img src="docs/architecture-icon.png" width="640" height="400" alt="recruiting-automation architecture (click for the full diagram)"></a>
 
 <!-- SUMMARY:START generated from workspace-linkedin-profile/Projects.json by scripts/build_readme_header.py; edit there -->
 launchd-scheduled pipeline orchestrating inbox classification, Gmail triage, LLM job-description evaluation, and tailored résumé and cover-letter generation.
